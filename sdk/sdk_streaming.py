@@ -20,5 +20,3 @@ class StreamingAPI:
         self.use_connection_pool = use_connection_pool
         self.encryption_key = encryption_key  # None means no encryption
         self.max_blocks_in_chunk = max_blocks_in_chunk
-
-def fileinfo(self, name, fileName)

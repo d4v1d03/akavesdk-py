@@ -1,7 +1,9 @@
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 import logging
-from . import ipc, memory, pb, spclient
+from private import memory, spclient
+from private.pb import nodeapi_pb2_grpc, ipcnodeapi_pb2_grpc
+from private.ipc.client import Client
 from private.encryption import derive_key
 from typing import List, Optional
 
@@ -39,7 +41,7 @@ class SDK:
 
         # gRPC client connection
         self.conn = grpc.insecure_channel(address)
-        self.client = pb.NodeAPIClient(self.conn)
+        self.client = nodeapi_pb2_grpc.NodeAPIStub(self.conn)
 
         # Additional configurations (erasure coding, encryption validation)
         if len(self.encryption_key) != 0 and len(self.encryption_key) != 32:
@@ -63,8 +65,8 @@ class SDK:
                             self.streaming_max_blocks_in_chunk)
 
     def ipc(self):
-        client = pb.IPCNodeAPIClient(self.conn)
-        ipc_instance = ipc.Dial(self.conn, self.private_key, client)
+        client = ipcnodeapi_pb2_grpc(self.conn)
+        ipc_instance = Client.dial(self.conn, self.private_key, client)
         return IPC(client, self.conn, self.max_concurrency, self.block_part_size, self.use_connection_pool, self.encryption_key, ipc_instance)
 
     def create_bucket(self, name: str):
@@ -72,7 +74,7 @@ class SDK:
             raise SDKError("Invalid bucket name")
 
         # Call to gRPC API
-        response = self.client.bucket_create(pb.BucketCreateRequest(name=name))
+        response = self.client.bucket_create(nodeapi_pb2_grpc.NodeAPIStub.BucketCreate(name=name))
         return BucketCreateResult(name=response.name, created_at=response.created_at)
 
     def view_bucket(self, name: str):
@@ -80,13 +82,13 @@ class SDK:
             raise SDKError("Invalid bucket name")
 
         # Call to gRPC API
-        response = self.client.bucket_view(pb.BucketViewRequest(name=name))
+        response = self.client.bucket_view(nodeapi_pb2_grpc.NodeAPIStub.BucketView(name=name))
         return Bucket(name=response.name, created_at=response.created_at)
 
     def delete_bucket(self, name:str):
        # Call to gRPC API
        try:
-           self.client.bucket_delete(pb.BucketDeleteRequest(name=name))
+           self.client.bucket_delete(nodeapi_pb2_grpc.NodeAPIStub.BucketDelete(name=name))
        except SDKError as err:
               logging.error(f"Error deleting bucket: {err}")
               return False

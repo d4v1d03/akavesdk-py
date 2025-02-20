@@ -1,4 +1,5 @@
 import grpc
+import ipfshttpclient
 from google.protobuf.timestamp_pb2 import Timestamp
 import logging
 from private.memory.memory import Size
@@ -7,6 +8,8 @@ from private.ipc.client import Client
 from private.spclient.spclient import SPClient
 from private.encryption import derive_key
 from typing import List, Optional
+from multiformats import cid
+
 
 BLOCK_SIZE = 1 * Size.MB
 ENCRYPTION_OVERHEAD = 28  # 16 bytes for AES-GCM tag, 12 bytes for nonce
@@ -94,6 +97,28 @@ class SDK:
        except SDKError as err:
               logging.error(f"Error deleting bucket: {err}")
               return False
+       
+   
+
+    def extract_block_data(id_str: str, data: bytes) -> bytes:
+        try:
+         block_cid = cid.decode(id_str)
+        except Exception as e:
+          raise ValueError(f"Invalid CID: {e}")
+
+        if block_cid.codec == "dag-pb":
+          try:
+            dag_node = ipfshttpclient.codec.decode("dag-pb", data) #Decoding the DAG node
+            unixfs_data = dag_node["Data"] 
+            return unixfs_data
+          except Exception as e:
+            raise ValueError(f"Failed to decode DAG node: {e}")
+    
+        elif block_cid.codec == "raw":
+         return data 
+     
+        else:
+         raise ValueError(f"Unknown CID type: {block_cid.codec}")
 
 
 class BucketCreateResult:

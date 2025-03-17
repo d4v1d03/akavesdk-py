@@ -1,74 +1,49 @@
-import sys 
-import os
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import unittest
-import numpy as np
-from itertools import combinations
-from sdk.erasure_code import ErasureCode  
+from sdk.erasure_code import ErasureCode, missing_shards_idx, split_into_blocks
 
 class TestErasureCode(unittest.TestCase):
 
-    def test_erasure_code_invalid_params(self):
+    def test_invalid_params(self):
         with self.assertRaises(ValueError):
-            ErasureCode(0, 0)
-
+            _ = ErasureCode.new(0, 0)
         with self.assertRaises(ValueError):
-            ErasureCode(16, 0)
+            _ = ErasureCode.new(16, 0)
 
     def test_erasure_code(self):
         data = b"Quick brown fox jumps over the lazy dog"
         data_shards = 5
         parity_shards = 3
+        total_shards = data_shards + parity_shards
 
-        encoder = ErasureCode(data_shards, parity_shards)
+        encoder = ErasureCode.new(data_shards, parity_shards)
         self.assertEqual(encoder.data_blocks, data_shards)
         self.assertEqual(encoder.parity_blocks, parity_shards)
 
         encoded = encoder.encode(data)
-        shard_size = len(encoded[0])  
-
-        def split_into_blocks(encoded_shards):
-            return [bytearray(shard) for shard in encoded_shards]
-
-        def missing_shards_idx(n, k):
-            return list(combinations(range(n), k))
+        shard_size = len(encoded) // total_shards
 
         with self.subTest("no missing shards"):
-            blocks = split_into_blocks(encoded)
-            extracted = encoder.extract_data(blocks, len(data))
-            self.assertEqual(data, extracted)
+            blocks = split_into_blocks(encoded, shard_size)
+            extracted = encoder.extract_data_blocks(blocks, len(data))
+            self.assertEqual(extracted, data)
 
-        with self.subTest(f"missing no more than {parity_shards} shards"):
+        with self.subTest("missing up to parity shards"):
             all_combos = []
             for k in range(1, parity_shards + 1):
-                all_combos.extend(missing_shards_idx(data_shards + parity_shards, k))
-
-            encoded = encoder.encode(data)
-
+                all_combos.extend(missing_shards_idx(total_shards, k))
             for missing_idxs in all_combos:
-                blocks = split_into_blocks(encoded)
-        
-        # Mark missing shards as None
-            for idx in missing_idxs:
-             blocks[idx] = None  # Properly indicate missing shards
+                blocks = split_into_blocks(encoded, shard_size)
+                for idx in missing_idxs:
+                    blocks[idx] = None
+                extracted = encoder.extract_data_blocks(blocks, len(data))
+                self.assertEqual(extracted, data)
 
-        # Get first 5 available shards (data_blocks=5)
-             valid_blocks = [shard if shard is not None else None for shard in blocks]
-        
-             extracted = encoder.extract_data(valid_blocks, len(data))
-             self.assertEqual(data, extracted)  # Now compares bytes-to-bytes
-        # Missing more than parity shards
-             with self.subTest(f"missing more than {parity_shards} shards"):
-              blocks = split_into_blocks(encoded)
-    # Mark more than parity_shards as missing (None)
-        for i in range(parity_shards + 1):
-         blocks[i] = None
-        with self.assertRaises(RuntimeError):
-         encoder.extract_data(blocks, len(data))
+        with self.subTest("missing more than parity shards"):
+            blocks = split_into_blocks(encoded, shard_size)
+            for i in range(parity_shards + 1):
+                blocks[i] = None
+            with self.assertRaises(ValueError):
+                _ = encoder.extract_data_blocks(blocks, len(data))
 
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

@@ -1,7 +1,7 @@
 # Core dependencies
-grpcio==1.64.0
-grpcio-tools==1.41.1
-protobuf>=3.20.3,<4.0
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+protobuf>=5.26.1,<6.0dev
 uuid==1.30
 
 # IPFS & MerkleDAG
@@ -10,11 +10,12 @@ cid==0.1.3
 multiformats==0.3.1.post4
 
 # Ethereum-related dependencies
-web3==5.28.0
-eth-account==0.5.8
-eth-hash==0.5.2
-eth-keys==0.3.4
-rlp==1.0.0
+web3==6.11.3
+eth-account>=0.8.0
+eth-hash>=0.5.2
+eth-keys>=0.4.0
+eth-utils>=2.1.0
+rlp>=2.0.1
 pycryptodome==3.20.0
 
 # Logging & monitoring
@@ -44,3 +45,7 @@ cryptography==36.0.0
 #erasure
 reedsolo
 numpy
+
+# Testing dependencies
+pytest>=7.4.0
+pytest-mock>=3.12.0

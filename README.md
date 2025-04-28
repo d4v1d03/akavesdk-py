@@ -36,7 +36,7 @@ You can set up your authentication in several ways:
 
 ```bash
 # Set these environment variables
-export AKAVE_SDK_NODE="connect.akave.ai:5500"  # Default Akave node endpoint for streaming operations
+export AKAVE_SDK_NODE="connect.akave.ai:5000"  # Default Akave node endpoint for streaming operations
 export AKAVE_IPC_NODE="connect.akave.ai:5500"  # Default Akave node endpoint for IPC operations
 export AKAVE_PRIVATE_KEY="your_ethereum_private_key"  # Required for blockchain operations
 export AKAVE_ENCRYPTION_KEY="your_32_byte_encryption_key"  # Optional, for file encryption
@@ -63,7 +63,7 @@ from akavesdk import SDK
 
 # Initialize with explicit parameters
 sdk = SDK(
-    address="connect.akave.ai:5500",  # Akave endpoint for streaming operations
+    address="connect.akave.ai:5000",  # Akave endpoint for streaming operations
     max_concurrency=10,
     block_part_size=1 * 1024 * 1024,  # 1MB
     use_connection_pool=True,

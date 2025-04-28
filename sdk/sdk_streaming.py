@@ -35,7 +35,6 @@ EncryptionOverhead = 16  # 16 bytes overhead from encryption
 
 @dataclass
 class Chunk:
-    """Represents a chunk of a file for download"""
     CID: str
     EncodedSize: int
     Size: int
@@ -43,7 +42,6 @@ class Chunk:
 
 @dataclass
 class FileUpload:
-    """Represents a file upload request"""
     BucketName: str
     Name: str
     StreamID: str
@@ -51,7 +49,6 @@ class FileUpload:
 
 @dataclass
 class FileDownload:
-    """Represents a file download request"""
     StreamID: str
     BucketName: str
     Name: str
@@ -59,7 +56,6 @@ class FileDownload:
 
 @dataclass
 class FileBlockUpload:
-    """Represents a block for upload"""
     cid: str
     data: bytes
     node_address: str = ""
@@ -68,7 +64,6 @@ class FileBlockUpload:
 
 @dataclass
 class FileChunkUpload:
-    """Represents a chunk upload"""
     StreamID: str
     Index: int
     ChunkCID: Any  # CID object
@@ -79,26 +74,22 @@ class FileChunkUpload:
 
 @dataclass
 class AkaveBlockData:
-    """Represents Akave block data for download"""
     NodeID: str
     NodeAddress: str
     Permit: bytes = b""
 
 @dataclass
 class FilecoinBlockData:
-    """Represents Filecoin block data for download"""
     BaseURL: str
 
 @dataclass
 class FileBlockDownload:
-    """Represents a block for download"""
     CID: str
     Akave: Optional[AkaveBlockData] = None
     Filecoin: Optional[FilecoinBlockData] = None
 
 @dataclass
 class FileChunkDownload:
-    """Represents a chunk download"""
     CID: str
     Index: int
     EncodedSize: int
@@ -127,7 +118,6 @@ class ConnectionPool:
             return client, None
     
     def close(self):
-        """Closes all connections in the pool"""
         with self.lock:
             for _, channel in self.connections.values():
                 channel.close()
@@ -135,7 +125,6 @@ class ConnectionPool:
         return None
 
 class DAGRoot:
-    """Simplified DAG Root implementation"""
     def __init__(self):
         self.links = []
     
@@ -167,7 +156,6 @@ class DAGRoot:
             return type('CID', (), {'string': lambda *args: cid_str})()
 
 def encryption_key(parent_key: bytes, *info_data: str):
-    """Derive an encryption key from a parent key and information data"""
     if len(parent_key) == 0:
         return b''
     
@@ -175,7 +163,6 @@ def encryption_key(parent_key: bytes, *info_data: str):
     return derive_key(parent_key, info.encode())
 
 def to_proto_chunk(stream_id: str, cid: str, index: int, size: int, blocks: List[FileBlockUpload]):
-    """Convert block data to protobuf chunk format"""
     pb_blocks = []
     for block in blocks:
         pb_blocks.append(nodeapi_pb2.Chunk.Block(
@@ -192,10 +179,7 @@ def to_proto_chunk(stream_id: str, cid: str, index: int, size: int, blocks: List
     )
 
 class StreamingAPI:
-    """
-    Exposes SDK file streaming API in Python.
-    This is the Python equivalent of the Go StreamingAPI.
-    """
+    
     def __init__(self, conn: grpc.Channel, client: Any,
                  erasure_code: Optional[ErasureCode] = None, 
                  max_concurrency: int = 10,
@@ -203,19 +187,7 @@ class StreamingAPI:
                  use_connection_pool: bool = True,
                  encryption_key: Optional[bytes] = None, 
                  max_blocks_in_chunk: int = 32):
-        """
-        Initialize a new StreamingAPI instance.
         
-        Args:
-            conn: gRPC connection
-            client: StreamAPI client
-            erasure_code: Erasure coding configuration
-            max_concurrency: Maximum concurrency for operations
-            block_part_size: Size of block parts
-            use_connection_pool: Whether to use connection pooling
-            encryption_key: Optional encryption key
-            max_blocks_in_chunk: Maximum blocks in one chunk
-        """
         self.client = client
         self.conn = conn
         self.sp_client = SPClient()
@@ -227,20 +199,6 @@ class StreamingAPI:
         self.max_blocks_in_chunk = max_blocks_in_chunk
     
     def file_info(self, ctx, bucket_name: str, file_name: str) -> FileMeta:
-        """
-        Returns meta information for a single file by bucket and file name.
-        
-        Args:
-            ctx: Context object
-            bucket_name: Name of the bucket
-            file_name: Name of the file
-            
-        Returns:
-            FileMeta: File metadata
-            
-        Raises:
-            SDKError: If there's an error fetching file information
-        """
         if bucket_name == "":
             raise SDKError("empty bucket name")
         if file_name == "":
@@ -259,19 +217,6 @@ class StreamingAPI:
             raise SDKError(f"failed to get file info: {str(err)}")
     
     def list_files(self, ctx, bucket_name: str) -> List[FileMeta]:
-        """
-        Returns list of files in a particular bucket.
-        
-        Args:
-            ctx: Context object
-            bucket_name: Name of the bucket
-            
-        Returns:
-            List[FileMeta]: List of file metadata
-            
-        Raises:
-            SDKError: If there's an error listing files
-        """
         if bucket_name == "":
             raise SDKError("empty bucket name")
         
@@ -291,20 +236,6 @@ class StreamingAPI:
             raise SDKError(f"failed to list files: {str(err)}")
     
     def file_versions(self, ctx, bucket_name: str, file_name: str) -> List[FileMeta]:
-        """
-        Returns list of file versions in a particular bucket.
-        
-        Args:
-            ctx: Context object
-            bucket_name: Name of the bucket
-            file_name: Name of the file
-            
-        Returns:
-            List[FileMeta]: List of file versions metadata
-            
-        Raises:
-            SDKError: If there's an error listing file versions
-        """
         if bucket_name == "":
             raise SDKError("empty bucket name")
         
@@ -325,20 +256,6 @@ class StreamingAPI:
             raise SDKError(f"failed to list file versions: {str(err)}")
     
     def create_file_upload(self, ctx, bucket_name: str, file_name: str) -> FileUpload:
-        """
-        Creates a new file upload request.
-        
-        Args:
-            ctx: Context object
-            bucket_name: Name of the bucket
-            file_name: Name of the file
-            
-        Returns:
-            FileUpload: File upload information
-            
-        Raises:
-            SDKError: If there's an error creating file upload
-        """
         if bucket_name == "":
             raise SDKError("empty bucket name")
         
@@ -360,20 +277,6 @@ class StreamingAPI:
             raise SDKError(f"failed to create file upload: {str(err)}")
     
     def upload(self, ctx, upload: FileUpload, reader: BinaryIO) -> FileMeta:
-        """
-        Uploads a file using streaming api.
-        
-        Args:
-            ctx: Context object
-            upload: File upload information
-            reader: File reader
-            
-        Returns:
-            FileMeta: File metadata
-            
-        Raises:
-            SDKError: If there's an error uploading file
-        """
         try:
             chunk_enc_overhead = 0
             file_enc_key = b''
@@ -430,21 +333,6 @@ class StreamingAPI:
             raise SDKError(f"failed to upload file: {str(err)}")
     
     def create_file_download(self, ctx, bucket_name: str, file_name: str, root_cid: str = "") -> FileDownload:
-        """
-        Creates a new download request.
-        
-        Args:
-            ctx: Context object
-            bucket_name: Name of the bucket
-            file_name: Name of the file
-            root_cid: Root CID (optional, for specific version)
-            
-        Returns:
-            FileDownload: File download information
-            
-        Raises:
-            SDKError: If there's an error creating file download
-        """
         try:
             request = nodeapi_pb2.StreamFileDownloadCreateRequest(
                 bucket_name=bucket_name,
@@ -473,22 +361,6 @@ class StreamingAPI:
             raise SDKError(f"failed to create file download: {str(err)}")
     
     def create_range_file_download(self, ctx, bucket_name: str, file_name: str, start: int, end: int) -> FileDownload:
-        """
-        Creates a new download request with block ranges.
-        
-        Args:
-            ctx: Context object
-            bucket_name: Name of the bucket
-            file_name: Name of the file
-            start: Start index
-            end: End index
-            
-        Returns:
-            FileDownload: File download information
-            
-        Raises:
-            SDKError: If there's an error creating file download
-        """
         try:
             request = nodeapi_pb2.StreamFileDownloadRangeCreateRequest(
                 bucket_name=bucket_name,
@@ -518,17 +390,6 @@ class StreamingAPI:
             raise SDKError(f"failed to create file download range: {str(err)}")
     
     def download(self, ctx, file_download: FileDownload, writer: BinaryIO) -> None:
-        """
-        Downloads a file using streaming api.
-        
-        Args:
-            ctx: Context object
-            file_download: File download information
-            writer: File writer
-            
-        Raises:
-            SDKError: If there's an error downloading file
-        """
         try:
             file_enc_key = b''
             if self.encryption_key:
@@ -550,18 +411,6 @@ class StreamingAPI:
             raise SDKError(f"failed to download file: {str(err)}")
     
     def download_v2(self, ctx, file_download: FileDownload, writer: BinaryIO) -> None:
-        """
-        Downloads a file using streaming api V2.
-        This version can download blocks from either filecoin or akave nodes.
-        
-        Args:
-            ctx: Context object
-            file_download: File download information
-            writer: File writer
-            
-        Raises:
-            SDKError: If there's an error downloading file
-        """
         try:
             file_enc_key = b''
             if self.encryption_key:
@@ -583,18 +432,6 @@ class StreamingAPI:
             raise SDKError(f"failed to download file: {str(err)}")
     
     def download_random(self, ctx, file_download: FileDownload, writer: BinaryIO) -> None:
-        """
-        Downloads a file using streaming api and fetches only randomly half of the blocks.
-        Only works with erasure coding enabled.
-        
-        Args:
-            ctx: Context object
-            file_download: File download information
-            writer: File writer
-            
-        Raises:
-            SDKError: If there's an error downloading file
-        """
         if self.erasure_code is None:
             raise SDKError("erasure coding is not enabled")
         
@@ -619,17 +456,6 @@ class StreamingAPI:
             raise SDKError(f"failed to download file: {str(err)}")
     
     def file_delete(self, ctx, bucket_name: str, file_name: str) -> None:
-        """
-        Deletes a file from a bucket.
-        
-        Args:
-            ctx: Context object
-            bucket_name: Name of the bucket
-            file_name: Name of the file
-            
-        Raises:
-            SDKError: If there's an error deleting file
-        """
         try:
             request = nodeapi_pb2.StreamFileDeleteRequest(
                 bucket_name=bucket_name,
@@ -642,16 +468,6 @@ class StreamingAPI:
     
     # Helper methods
     def _to_file_meta(self, file_meta, bucket_name: str) -> FileMeta:
-        """
-        Converts protobuf file meta to FileMeta model.
-        
-        Args:
-            file_meta: Protobuf file metadata
-            bucket_name: Name of the bucket
-            
-        Returns:
-            FileMeta: Converted file metadata
-        """
         # Get created_at, handling both protobuf timestamp and datetime
         created_at = None
         if hasattr(file_meta, 'created_at'):
@@ -696,22 +512,6 @@ class StreamingAPI:
         return str(root_cid)
     
     def _create_chunk_upload(self, ctx, file_upload, index, file_encryption_key, data):
-        """
-        Create a chunk upload for the given data.
-        
-        Args:
-            ctx: Context object
-            file_upload: FileUpload object
-            index: Chunk index
-            file_encryption_key: Encryption key for the file
-            data: Raw data to upload
-            
-        Returns:
-            FileChunkUpload: Created chunk upload
-            
-        Raises:
-            SDKError: If there's an error creating the chunk upload
-        """
         try:
             # Encrypt the data if an encryption key is provided
             if len(file_encryption_key) > 0:
@@ -788,16 +588,6 @@ class StreamingAPI:
             raise SDKError(f"failed to create chunk upload: {str(err)}")
     
     def _upload_chunk(self, ctx, file_chunk_upload: FileChunkUpload):
-        """
-        Upload a chunk to the storage nodes.
-        
-        Args:
-            ctx: Context object
-            file_chunk_upload: FileChunkUpload object with chunk data
-            
-        Raises:
-            SDKError: If there's an error uploading the chunk
-        """
         try:
             pool = ConnectionPool()
             
@@ -834,19 +624,6 @@ class StreamingAPI:
             raise SDKError(f"failed to upload chunk: {str(err)}")
     
     def _upload_block(self, ctx, pool: ConnectionPool, block_index: int, block: FileBlockUpload, proto_chunk):
-        """
-        Upload a block to a storage node.
-        
-        Args:
-            ctx: Context object
-            pool: Connection pool
-            block_index: Index of the block in the chunk
-            block: Block data to upload
-            proto_chunk: Protobuf chunk data
-            
-        Raises:
-            SDKError: If there's an error uploading the block
-        """
         try:
             # Create a client for the node
             client, closer = pool.create_streaming_client(block.node_address, self.use_connection_pool)
@@ -904,7 +681,6 @@ class StreamingAPI:
             raise SDKError(f"failed to upload block {block.cid}: {str(err)}")
     
     def _commit_stream(self, ctx, upload, root_cid, chunk_count):
-        """Placeholder for committing stream"""
         # TODO: Implement stream commit
         request = nodeapi_pb2.StreamFileUploadCommitRequest(
             stream_id=upload.StreamID,
@@ -926,7 +702,6 @@ class StreamingAPI:
         )
     
     def _create_chunk_download(self, ctx, stream_id, chunk):
-        """Placeholder for creating chunk download"""
         # TODO: Implement chunk download creation
         request = nodeapi_pb2.StreamFileDownloadChunkCreateRequest(
             stream_id=stream_id,
@@ -955,7 +730,6 @@ class StreamingAPI:
         )
     
     def _create_chunk_download_v2(self, ctx, stream_id, chunk):
-        """Placeholder for creating chunk download v2"""
         # TODO: Implement chunk download v2 creation
         request = nodeapi_pb2.StreamFileDownloadChunkCreateRequest(
             stream_id=stream_id,
@@ -989,19 +763,6 @@ class StreamingAPI:
         )
     
     def _download_chunk_blocks(self, ctx, stream_id, chunk_download, file_encryption_key, writer):
-        """
-        Download all blocks for a chunk and write the combined data to the writer.
-        
-        Args:
-            ctx: Context object
-            stream_id: Stream ID
-            chunk_download: FileChunkDownload object
-            file_encryption_key: Encryption key for the file
-            writer: Writer to write the data to
-            
-        Raises:
-            SDKError: If there's an error downloading the blocks
-        """
         try:
             # Create a connection pool
             pool = ConnectionPool()
@@ -1054,19 +815,6 @@ class StreamingAPI:
             raise SDKError(f"failed to download chunk blocks: {str(err)}")
     
     def _download_random_chunk_blocks(self, ctx, stream_id, chunk_download, file_encryption_key, writer):
-        """
-        Download a random subset of blocks for a chunk (works only with erasure coding).
-        
-        Args:
-            ctx: Context object
-            stream_id: Stream ID
-            chunk_download: FileChunkDownload object
-            file_encryption_key: Encryption key for the file
-            writer: Writer to write the data to
-            
-        Raises:
-            SDKError: If there's an error downloading the blocks
-        """
         try:
             # Create a connection pool
             pool = ConnectionPool()
@@ -1125,24 +873,6 @@ class StreamingAPI:
             raise SDKError(f"failed to download random chunk blocks: {str(err)}")
     
     def _fetch_block_data(self, ctx, pool, stream_id, chunk_cid, chunk_index, block_index, block):
-        """
-        Fetch block data from either Akave or Filecoin.
-        
-        Args:
-            ctx: Context object
-            pool: Connection pool
-            stream_id: Stream ID
-            chunk_cid: Chunk CID
-            chunk_index: Chunk index
-            block_index: Block index
-            block: FileBlockDownload object
-            
-        Returns:
-            bytes: Block data
-            
-        Raises:
-            SDKError: If there's an error fetching the block data
-        """
         try:
             # Check if block metadata is available
             if block.Akave is None and block.Filecoin is None:

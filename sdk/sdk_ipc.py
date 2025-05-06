@@ -106,27 +106,14 @@ class IPC:
             raise SDKError("invalid bucket name")
 
         try:
-            # First check if bucket already exists to provide better error message
-            existing = self.view_bucket(ctx, name)
-            if existing:
-                raise SDKError(f"bucket '{name}' already exists")
-
             # Create bucket using the storage contract with proper gas estimation
             try:
-                # Get the contract function
-                contract_func = self.ipc.storage.contract.functions.createBucket(name)
-                
-                # Estimate gas with a buffer
-                estimated_gas = int(contract_func.estimate_gas({
-                    'from': self.ipc.auth.address
-                }) * 1.2)  # Add 20% buffer
-                
                 # Create bucket with estimated gas
                 self.ipc.storage.create_bucket(
                     bucket_name=name,
                     from_address=self.ipc.auth.address,
                     private_key=self.ipc.auth.key,
-                    gas_limit=estimated_gas
+                    gas_limit=500000  # Using default gas limit
                 )
             except Exception as e:
                 if "revert" in str(e).lower():
@@ -139,7 +126,6 @@ class IPC:
             # Get bucket info to return creation result
             bucket_info = self.ipc.storage.get_bucket(name)
             
-            # bucket_info returns (name, created_at, owner_address)
             if not bucket_info:
                 raise SDKError(f"bucket creation verification failed: could not retrieve bucket '{name}'")
                 

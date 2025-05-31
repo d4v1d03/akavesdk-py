@@ -15,6 +15,56 @@ from .common import SDKError, BLOCK_SIZE, MIN_BUCKET_NAME_LENGTH
 import os
 import time
 
+class AkaveContractFetcher:
+    """Fetches contract addresses from Akave node"""
+    
+    def __init__(self, node_address: str):
+        self.node_address = node_address
+        self.channel = None
+        self.stub = None
+    
+    def connect(self) -> bool:
+        """Connect to the Akave node"""
+        try:
+            logging.info(f"🔗 Connecting to {self.node_address}...")
+            self.channel = grpc.insecure_channel(self.node_address)
+            self.stub = ipcnodeapi_pb2_grpc.IPCNodeAPIStub(self.channel)
+            return True
+            
+        except grpc.RpcError as e:
+            logging.error(f"❌ gRPC error: {e.code()} - {e.details()}")
+            return False
+        except Exception as e:
+            logging.error(f"❌ Connection error: {type(e).__name__}: {str(e)}")
+            return False
+    
+    def fetch_contract_addresses(self) -> Optional[dict]:
+        """Fetch contract addresses from the node"""
+        if not self.stub:
+            return None
+        
+        try:
+            request = ipcnodeapi_pb2.ConnectionParamsRequest()
+            response = self.stub.ConnectionParams(request)
+            
+            contract_info = {
+                'dial_uri': response.dial_uri if hasattr(response, 'dial_uri') else None,
+                'contract_address': response.contract_address if hasattr(response, 'contract_address') else None,
+            }
+            
+            if hasattr(response, 'access_address'):
+                contract_info['access_address'] = response.access_address
+            
+            return contract_info
+        except Exception as e:
+            logging.error(f"❌ Error fetching contract info: {e}")
+            return None
+    
+    def close(self):
+        """Close the gRPC connection"""
+        if self.channel:
+            self.channel.close()
+
 class SDK:
     def __init__(self, address: str, max_concurrency: int, block_part_size: int, use_connection_pool: bool,
                  encryption_key: Optional[bytes] = None, private_key: Optional[str] = None,
@@ -34,6 +84,9 @@ class SDK:
         self.streaming_max_blocks_in_chunk = streaming_max_blocks_in_chunk
         self.parity_blocks_count = parity_blocks_count
         self.ipc_address = ipc_address or address  # Use provided IPC address or fallback to main address
+        
+        # Cache for dynamically fetched contract info
+        self._contract_info = None
 
         if self.block_part_size <= 0 or self.block_part_size > BLOCK_SIZE:
             raise SDKError(f"Invalid blockPartSize: {block_part_size}. Valid range is 1-{BLOCK_SIZE}")
@@ -63,6 +116,41 @@ class SDK:
 
         self.sp_client = SPClient()
 
+    def _fetch_contract_info(self) -> Optional[dict]:
+        """Dynamically fetch contract information using multiple endpoints"""
+        if self._contract_info:
+            return self._contract_info
+            
+        # Try multiple endpoints for contract fetching
+        endpoints = [
+            'yucca.akave.ai:5500',
+            'connect.akave.ai:5500'
+        ]
+        
+        for endpoint in endpoints:
+            logging.info(f"🔄 Trying endpoint: {endpoint}")
+            fetcher = AkaveContractFetcher(endpoint)
+            
+            if fetcher.connect():
+                logging.info("✅ Connected successfully!")
+                
+                info = fetcher.fetch_contract_addresses()
+                fetcher.close()
+                
+                if info and info.get('contract_address') and info.get('dial_uri'):
+                    logging.info("✅ Successfully fetched contract information!")
+                    logging.info(f"📍 Contract Details: dial_uri={info.get('dial_uri')}, contract_address={info.get('contract_address')}")
+                    self._contract_info = info
+                    return info
+                else:
+                    logging.warning("❌ Failed to fetch complete contract information")
+            else:
+                logging.warning(f"❌ Failed to connect to {endpoint}")
+                fetcher.close()
+        
+        logging.error("❌ All endpoints failed for contract fetching")
+        return None
+
     def close(self):
         """Close the gRPC channels."""
         if self.conn:
@@ -86,27 +174,20 @@ class SDK:
     def ipc(self):
         """Returns SDK IPC API."""
         try:
-            # Get connection parameters from the node
-            try:
-                params_request = ipcnodeapi_pb2.ConnectionParamsRequest()
-                conn_params = self.ipc_client.ConnectionParams(params_request)
-                logging.info(f"Received connection params - dial_uri: {conn_params.dial_uri}, contract: {conn_params.contract_address}")
-            except Exception as e:
-                logging.warning(f"Could not get connection parameters, using defaults: {str(e)}")
-                # Use default values if connection params call fails
-                conn_params = type('ConnectionParams', (), {
-                    'dial_uri': os.getenv('ETHEREUM_NODE_URL', 'https://n1-us.akave.ai/ext/bc/2JMWNmZbYvWcJRPPy1siaDBZaDGTDAaqXoY5UBKh4YrhNFzEce/rpc'),
-                    'contract_address': os.getenv('STORAGE_CONTRACT_ADDRESS', '0x59E4452746858657a91cB8335BD1c13CBa3aD505')
-                })
+            # Get connection parameters dynamically
+            conn_params = self._fetch_contract_info()
+            
+            if not conn_params:
+                raise SDKError("Could not fetch contract information from any Akave node")
             
             if not self.private_key:
                 raise SDKError("Private key is required for IPC operations")
             
             config = Config(
-                dial_uri=conn_params.dial_uri,
+                dial_uri=conn_params['dial_uri'],
                 private_key=self.private_key,
-                storage_contract_address=conn_params.contract_address,
-                access_contract_address=os.getenv('ACCESS_CONTRACT_ADDRESS', '')
+                storage_contract_address=conn_params['contract_address'],
+                access_contract_address=conn_params.get('access_address', '')
             )
             
             # Create IPC instance with retries

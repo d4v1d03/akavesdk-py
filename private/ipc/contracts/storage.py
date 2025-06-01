@@ -365,13 +365,14 @@ class StorageContract:
         if receipt.status != 1:
             raise Exception(f"Transaction failed for {function_name}")
 
-    def delete_bucket(self, bucket_name: str, from_address: HexAddress, private_key: str) -> HexStr:
+    def delete_bucket(self, bucket_name: str, from_address: HexAddress, private_key: str, bucket_id_hex: str = None) -> HexStr:
         """Deletes a bucket.
         
         Args:
             bucket_name: Name of the bucket to delete
             from_address: Address deleting the bucket
             private_key: Private key for signing the transaction
+            bucket_id_hex: Hex string bucket ID from IPC BucketView response (e.g., "a1b2c3d4...")
             
         Returns:
             Transaction hash of the delete operation
@@ -379,19 +380,33 @@ class StorageContract:
         Raises:
             Exception: If the transaction fails or is reverted
         """
-        # First get bucket information to retrieve bucket ID and owner (like Go SDK)
+        if not bucket_id_hex:
+            raise Exception("bucket_id_hex is required - get it from IPC BucketView response")
+            
         try:
-            bucket_info = self.get_bucket(bucket_name)
-            bucket_id = bucket_info[0]  # id is the first element
-            bucket_owner = bucket_info[3]  # owner is the fourth element (index 3)
+            # Convert hex string to bytes32 like Go SDK does: hex.DecodeString(bucket.Id)
+            if bucket_id_hex.startswith('0x'):
+                bucket_id_hex = bucket_id_hex[2:]
+            
+            # Ensure we have exactly 32 bytes (64 hex chars)
+            if len(bucket_id_hex) != 64:
+                bucket_id_hex = bucket_id_hex.ljust(64, '0')  # Pad with zeros if needed
+                
+            bucket_id_bytes = bytes.fromhex(bucket_id_hex)
+            print(f"Using bucket_id from IPC: 0x{bucket_id_hex}")
             
             # Get bucket index by name and owner (like Go SDK)
-            bucket_index = self.contract.functions.getBucketIndexByName(bucket_name, from_address).call()
+            try:
+                bucket_index = self.contract.functions.getBucketIndexByName(bucket_name, from_address).call()
+                print(f"Got bucket_index: {bucket_index}")
+            except Exception as e:
+                print(f"getBucketIndexByName failed: {e}")
+                raise Exception(f"Failed to get bucket index: {str(e)}")
             
         except Exception as e:
-            raise Exception(f"Failed to get bucket info: {str(e)}")
+            raise Exception(f"Failed to prepare bucket deletion: {str(e)}")
 
-        # Build transaction with correct 3 parameters: id, name, index
+        # Build transaction parameters - use standard legacy transaction
         tx_params = {
             'from': from_address,
             'gas': 500000,  # Gas limit
@@ -400,21 +415,66 @@ class StorageContract:
         }
         
         try:
-            # Call deleteBucket with 3 parameters like Go SDK: bucketID, bucket.Name, bucketIdx
+            print(f"Calling deleteBucket with:")
+            print(f"  bucket_id: 0x{bucket_id_hex}")
+            print(f"  bucket_name: {bucket_name}")
+            print(f"  bucket_index: {bucket_index}")
+            print(f"  from_address: {from_address}")
+            
+            # Try to call the function first to see if it would revert
+            try:
+                self.contract.functions.deleteBucket(
+                    bucket_id_bytes,      # bytes32 id (from IPC BucketView response)
+                    bucket_name,          # string name  
+                    bucket_index          # uint256 index
+                ).call({'from': from_address})
+                print("deleteBucket call simulation succeeded")
+            except Exception as call_error:
+                print(f"deleteBucket call simulation failed: {call_error}")
+                
+                # Try to decode the revert reason
+                error_str = str(call_error)
+                if "execution reverted" in error_str.lower():
+                    # Extract any hex data from the error
+                    import re
+                    hex_match = re.search(r'0x[a-fA-F0-9]+', error_str)
+                    if hex_match:
+                        error_data = hex_match.group()
+                        print(f"Revert data: {error_data}")
+                        
+                        # Try to decode common error selectors
+                        if error_data.startswith('0x938a92b7'):
+                            print("Error: Bucket not found or doesn't exist")
+                        elif error_data.startswith('0x08c379a0'):
+                            # Standard revert reason
+                            try:
+                                from eth_abi import decode_single
+                                reason = decode_single('string', bytes.fromhex(error_data[10:]))
+                                print(f"Revert reason: {reason}")
+                            except:
+                                print(f"Could not decode revert reason from: {error_data}")
+                
+                raise Exception(f"Contract call simulation failed: {str(call_error)}")
+            
+            # Build and send the transaction
             tx = self.contract.functions.deleteBucket(
-                bucket_id,      # bytes32 id
-                bucket_name,    # string name  
-                bucket_index    # uint256 index
+                bucket_id_bytes,      # bytes32 id (from IPC BucketView response)
+                bucket_name,          # string name  
+                bucket_index          # uint256 index
             ).build_transaction(tx_params)
+            
+            print(f"Built transaction")
             
             # Sign transaction
             signed_tx = self.web3.eth.account.sign_transaction(tx, private_key)
             
             # Send transaction
             tx_hash = self.web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+            print(f"Transaction sent: {tx_hash.hex()}")
             
             # Wait for receipt
             receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+            print(f"Transaction receipt: status={receipt.status}, gasUsed={receipt.gasUsed}")
             
             if receipt.status != 1:
                 raise Exception(f"Transaction failed with status: {receipt.status}")

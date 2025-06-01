@@ -62,7 +62,4 @@ pytest*
 *.sqlite3
 
 test.py 
-test_ipc_connection.py
 generate_protos.py
-test_sdk_connection.py
-test_streaming_connection.py

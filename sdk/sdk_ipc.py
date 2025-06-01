@@ -202,14 +202,11 @@ class IPC:
     def delete_bucket(self, ctx, name: str) -> None:
         if not name:
             raise SDKError("empty bucket name")
-
         try:
-            # First check if bucket exists using the same request structure as view_bucket
             request = ipcnodeapi_pb2.IPCBucketViewRequest(
                 name=name,
                 address=self.ipc.auth.address.lower()
             )
-            
             try:
                 response = self.client.BucketView(request)
                 if not response:
@@ -223,29 +220,27 @@ class IPC:
                 raise SDKError(f"failed to check bucket existence: {e.details()}")
 
             # If we get here, bucket exists - proceed with deletion
+            # Get bucket ID from IPC response like Go SDK does
+            bucket_id_hex = response.id if hasattr(response, 'id') and response.id else None
+            if not bucket_id_hex:
+                logging.error(f"No bucket ID returned from IPC for bucket '{name}'")
+                raise SDKError(f"bucket ID not available from IPC response")
+                
+            logging.info(f"Got bucket ID from IPC: {bucket_id_hex}")
+            
             try:
-                tx = self.ipc.storage.delete_bucket(
-                    name,
-                    self.ipc.auth.address,
-                    self.ipc.auth.key
+                tx_hash = self.ipc.storage.delete_bucket(
+                    bucket_name=name,
+                    from_address=self.ipc.auth.address,
+                    private_key=self.ipc.auth.key,
+                    bucket_id_hex=bucket_id_hex  # Pass the bucket ID from IPC response
                 )
-                logging.info(f"IPC delete_bucket transaction sent for '{name}'")
+                logging.info(f"IPC delete_bucket transaction sent for '{name}', tx_hash: {tx_hash}")
                 
-                # Get transaction receipt and verify status
-                receipt = self.ipc.web3.eth.wait_for_transaction_receipt(tx)
-                if receipt.status != 1:
-                    # Try to get revert reason with correct function signature
-                    try:
-                        # Generate bucket ID and use caller as owner for revert reason check
-                        bucket_id = self.ipc.web3.keccak(text=name)
-                        self.ipc.storage.contract.functions.deleteBucket(bucket_id, name, self.ipc.auth.address).call({
-                            'from': self.ipc.auth.address
-                        })
-                    except Exception as e:
-                        raise SDKError(f"Transaction reverted: {str(e)}")
-                    raise SDKError(f"Transaction failed. Receipt: {receipt}")
-                
+                # The storage contract delete_bucket method already handles receipt verification
+                # If we get here, the transaction was successful
                 return None
+                
             except Exception as e:
                 logging.error(f"Failed to delete bucket '{name}' on blockchain: {str(e)}")
                 raise SDKError(f"blockchain transaction failed: {str(e)}")

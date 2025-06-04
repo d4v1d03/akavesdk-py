@@ -18,7 +18,7 @@ from sdk.sdk_streaming import (
     FileBlockUpload, FileChunkDownload, FileBlockDownload, AkaveBlockData,
     FilecoinBlockData, ConnectionPool, DAGRoot
 )
-from sdk.sdk import SDKError
+from sdk.common import SDKError
 from sdk.model import FileMeta
 from sdk.erasure_code import ErasureCode
 

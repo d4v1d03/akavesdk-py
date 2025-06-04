@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
-from .sdk import SDKError
+from .common import SDKError
 from .model import FileMeta, FileListItem
 from .erasure_code import ErasureCode
 from private.pb import nodeapi_pb2

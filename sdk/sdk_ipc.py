@@ -7,7 +7,7 @@ import concurrent.futures
 from hashlib import sha256
 from typing import List, Optional, Callable, Dict, Any, Union, Tuple
 
-from .common import MIN_BUCKET_NAME_LENGTH, SDKError, BLOCK_SIZE, ENCRYPTION_OVERHEAD
+from .sdk import MIN_BUCKET_NAME_LENGTH, SDKError, BLOCK_SIZE, ENCRYPTION_OVERHEAD
 from .erasure_code import ErasureCode
 from .dag import build_dag, extract_block_data
 from .connection import ConnectionPool

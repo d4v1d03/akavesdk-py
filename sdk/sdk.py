@@ -2,26 +2,19 @@ import grpc
 import ipfshttpclient
 from google.protobuf.timestamp_pb2 import Timestamp
 import logging
-from private.memory.memory import Size
 from private.pb import nodeapi_pb2, nodeapi_pb2_grpc, ipcnodeapi_pb2_grpc
 from private.ipc.client import Client
 from private.spclient.spclient import SPClient
 from private.encryption import derive_key
 from typing import List, Optional
 from multiformats import cid
-
-
-BLOCK_SIZE = 1 * Size.MB
-ENCRYPTION_OVERHEAD = 28  # 16 bytes for AES-GCM tag, 12 bytes for nonce
-MIN_BUCKET_NAME_LENGTH = 3
-MIN_FILE_SIZE = 127  # 127 bytes
-
 from .sdk_ipc import IPC
-from .sdk_streaming import StreamingAPI
 from .erasure_code import ErasureCode
+from .common import BLOCK_SIZE, ENCRYPTION_OVERHEAD, MIN_BUCKET_NAME_LENGTH, MIN_FILE_SIZE, SDKError
 
-class SDKError(Exception):
-    pass
+def get_streaming_api():
+    from .sdk_streaming import StreamingAPI
+    return StreamingAPI
 
 class SDK:
     def __init__(self, address: str, max_concurrency: int, block_part_size: int, use_connection_pool: bool,
@@ -62,6 +55,7 @@ class SDK:
             self.conn.close()
 
     def streaming_api(self):
+        StreamingAPI = get_streaming_api()
         return StreamingAPI(self.conn, self.client, self.streaming_erasure_code, self.max_concurrency,
                             self.block_part_size, self.use_connection_pool, self.encryption_key,
                             self.streaming_max_blocks_in_chunk)

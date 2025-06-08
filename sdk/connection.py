@@ -1,13 +1,38 @@
 import grpc
+import time
 import threading
 from private.pb import nodeapi_pb2_grpc, ipcnodeapi_pb2_grpc
 
 
 class ConnectionPool:
-    def __init__(self):
+    # by default , retry 3 times with exponential backoff
+    # The init function sets the retries and delay parameters
+    def _retry(func, retries=3, delay=1):
+        def wrapper(self, **kwargs):
+            current_retry = 0
+            current_delay = delay
+            while current_retry < retries:
+                try:
+                    return func(self, **kwargs)
+                except Exception as e:
+                    current_retry += 1
+                    if current_retry >= retries:
+                        raise e
+                    print(f"Attempt {current_retry} failed: {e}. Retrying in {current_delay} seconds...")
+                    time.sleep(current_delay)
+                    current_delay *= 2
+            return None
+        return wrapper
+
+    def __init__(self, retries=3, delay=1):
         self._lock = threading.RLock()
         self._connections = {}
         self.use_connection_pool = False
+        self.create_client = self._retry(self.create_client, retries, delay)
+        self.create_ipc_client = self._retry(self.create_ipc_client, retries, delay)
+        self.get = self._retry(self.get, retries, delay)
+        self._new_connection = self._retry(self._new_connection, retries, delay)
+        self.close = self._retry(self.close, retries, delay) 
 
     def create_client(self, addr: str, pooled: bool):
         if pooled:

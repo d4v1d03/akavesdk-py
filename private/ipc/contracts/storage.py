@@ -266,6 +266,200 @@ class StorageContract:
                 "type": "event"
             },
             {
+                "anonymous": False,
+                "inputs": [
+                    {
+                        "indexed": True,
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "string",
+                        "name": "name",
+                        "type": "string"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    }
+                ],
+                "name": "CreateBucket",
+                "type": "event"
+            },
+            {
+                "anonymous": False,
+                "inputs": [
+                    {
+                        "indexed": True,
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "bytes32",
+                        "name": "bucketId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "string",
+                        "name": "name",
+                        "type": "string"
+                    },
+                    {
+                        "indexed": False,
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    }
+                ],
+                "name": "CreateFile",
+                "type": "event"
+            },
+            {
+                "anonymous": False,
+                "inputs": [
+                    {
+                        "indexed": True,
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "string",
+                        "name": "name",
+                        "type": "string"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    }
+                ],
+                "name": "DeleteBucket",
+                "type": "event"
+            },
+            {
+                "anonymous": False,
+                "inputs": [
+                    {
+                        "indexed": True,
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "bytes32",
+                        "name": "bucketId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "string",
+                        "name": "name",
+                        "type": "string"
+                    },
+                    {
+                        "indexed": False,
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    }
+                ],
+                "name": "DeleteFile",
+                "type": "event"
+            },
+            {
+                "anonymous": False,
+                "inputs": [
+                    {
+                        "indexed": True,
+                        "internalType": "bytes32",
+                        "name": "blockId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "bytes",
+                        "name": "peerId",
+                        "type": "bytes"
+                    }
+                ],
+                "name": "DeletePeerBlock",
+                "type": "event"
+            },
+            {
+                "anonymous": False,
+                "inputs": [],
+                "name": "EIP712DomainChanged",
+                "type": "event"
+            },
+            {
+                "anonymous": False,
+                "inputs": [
+                    {
+                        "indexed": True,
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "bytes32",
+                        "name": "bucketId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "indexed": True,
+                        "internalType": "string",
+                        "name": "name",
+                        "type": "string"
+                    },
+                    {
+                        "indexed": False,
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    }
+                ],
+                "name": "FileUploaded",
+                "type": "event"
+            },
+            {
+                "inputs": [],
+                "name": "MAX_BLOCKS_PER_FILE",
+                "outputs": [
+                    {
+                        "internalType": "uint64",
+                        "name": "",
+                        "type": "uint64"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "MAX_BLOCK_SIZE",
+                "outputs": [
+                    {
+                        "internalType": "uint64",
+                        "name": "",
+                        "type": "uint64"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
                 "inputs": [],
                 "name": "accessManager",
                 "outputs": [
@@ -276,6 +470,84 @@ class StorageContract:
                     }
                 ],
                 "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes",
+                        "name": "cid",
+                        "type": "bytes"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "bucketId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "name",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "encodedChunkSize",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes32[]",
+                        "name": "cids",
+                        "type": "bytes32[]"
+                    },
+                    {
+                        "internalType": "uint256[]",
+                        "name": "chunkBlocksSizes",
+                        "type": "uint256[]"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "chunkIndex",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "addFileChunk",
+                "outputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "",
+                        "type": "bytes32"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes",
+                        "name": "peerId",
+                        "type": "bytes"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "cid",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "isReplica",
+                        "type": "bool"
+                    }
+                ],
+                "name": "addPeerBlock",
+                "outputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    }
+                ],
+                "stateMutability": "nonpayable",
                 "type": "function"
             },
             {
@@ -577,6 +849,79 @@ class StorageContract:
                         "internalType": "string",
                         "name": "name",
                         "type": "string"
+                    }
+                ],
+                "name": "getFileByName",
+                "outputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "bytes32",
+                                "name": "id",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "bytes",
+                                "name": "fileCID",
+                                "type": "bytes"
+                            },
+                            {
+                                "internalType": "bytes32",
+                                "name": "bucketId",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "name",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "encodedSize",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "createdAt",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "actualSize",
+                                "type": "uint256"
+                            },
+                            {
+                                "components": [
+                                    {
+                                        "internalType": "bytes[]",
+                                        "name": "chunkCIDs",
+                                        "type": "bytes[]"
+                                    },
+                                    {
+                                        "internalType": "uint256[]",
+                                        "name": "chunkSize",
+                                        "type": "uint256[]"
+                                    }
+                                ],
+                                "internalType": "struct IStorage.Chunk",
+                                "name": "chunks",
+                                "type": "tuple"
+                            }
+                        ],
+                        "internalType": "struct IStorage.File",
+                        "name": "file",
+                        "type": "tuple"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "string",
+                        "name": "name",
+                        "type": "string"
                     },
                     {
                         "internalType": "bytes32",
@@ -594,6 +939,44 @@ class StorageContract:
                 ],
                 "stateMutability": "view",
                 "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "fileId",
+                        "type": "bytes32"
+                    }
+                ],
+                "name": "isFileFilled",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "fileId",
+                        "type": "bytes32"
+                    }
+                ],
+                "name": "isFileFilledV2",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
             }
         ]
         
@@ -606,6 +989,22 @@ class StorageContract:
             Address of the access manager contract
         """
         return self.contract.functions.accessManager().call()
+
+    def get_max_blocks_per_file(self) -> int:
+        """Gets the maximum number of blocks per file.
+        
+        Returns:
+            Maximum blocks per file
+        """
+        return self.contract.functions.MAX_BLOCKS_PER_FILE().call()
+
+    def get_max_block_size(self) -> int:
+        """Gets the maximum block size.
+        
+        Returns:
+            Maximum block size in bytes
+        """
+        return self.contract.functions.MAX_BLOCK_SIZE().call()
 
     def create_bucket(self, bucket_name: str, from_address: HexAddress, private_key: str, gas_limit: int = None) -> HexStr:
         """Creates a new bucket.
@@ -653,28 +1052,27 @@ class StorageContract:
         
         return tx_hash.hex()
 
-    def create_file(self, bucket_name: str, file_name: str, file_id: bytes, size: int, from_address: HexAddress, private_key: str) -> None:
-        """Creates a new file entry using the new ABI signature.
+    def create_file(self, from_address: HexAddress, private_key: str, bucket_id: bytes, file_name: str) -> HexStr:
+        """Creates a new file entry in the specified bucket.
         
         Args:
-            bucket_name: Name of the bucket containing the file
-            file_name: Name of the file
-            file_id: Unique ID of the file (not used in new ABI)
-            size: Size of the file in bytes (not used in new ABI)
             from_address: Address creating the file
             private_key: Private key for signing the transaction
+            bucket_id: ID of the bucket to create the file in (bytes32)
+            file_name: Name of the file
+            
+        Returns:
+            Transaction hash of the create operation
         """
-        # First get bucket to get bucket ID
-        bucket = self.contract.functions.getBucketByName(bucket_name).call()
-        bucket_id = bucket[0]  # bytes32 id
-        
-        # Build transaction with new signature: createFile(bucketId, name)
-        tx = self.contract.functions.createFile(bucket_id, file_name).build_transaction({
+        # Build transaction with signature: createFile(bucketId, name)
+        tx_params = {
             'from': from_address,
             'gas': 500000,  # Gas limit
             'gasPrice': self.web3.eth.gas_price,
             'nonce': self.web3.eth.get_transaction_count(from_address)
-        })
+        }
+        
+        tx = self.contract.functions.createFile(bucket_id, file_name).build_transaction(tx_params)
         
         # Sign transaction
         signed_tx = Account.sign_transaction(tx, private_key)
@@ -685,7 +1083,65 @@ class StorageContract:
         # Wait for receipt
         receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
         if receipt.status != 1:
-            raise Exception("Transaction failed")
+            # Get revert reason if possible
+            try:
+                self.contract.functions.createFile(bucket_id, file_name).call({
+                    'from': from_address
+                })
+            except Exception as e:
+                raise Exception(f"Transaction reverted: {str(e)}")
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()
+
+    def add_file_chunk(self, from_address: HexAddress, private_key: str, cid: bytes, bucket_id: bytes, name: str, encoded_chunk_size: int, cids: list, chunk_blocks_sizes: list, chunk_index: int) -> HexStr:
+        """Adds a chunk to a file.
+        
+        Args:
+            from_address: Address adding the chunk
+            private_key: Private key for signing the transaction
+            cid: CID of the chunk
+            bucket_id: ID of the bucket containing the file
+            name: Name of the file
+            encoded_chunk_size: Size of the encoded chunk
+            cids: List of block CIDs in the chunk
+            chunk_blocks_sizes: List of block sizes
+            chunk_index: Index of the chunk
+            
+        Returns:
+            Transaction hash of the add operation
+        """
+        # Build transaction
+        tx_params = {
+            'from': from_address,
+            'gas': 1000000,  # Higher gas limit for chunk operations
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': self.web3.eth.get_transaction_count(from_address)
+        }
+        
+        tx = self.contract.functions.addFileChunk(
+            cid, bucket_id, name, encoded_chunk_size, cids, chunk_blocks_sizes, chunk_index
+        ).build_transaction(tx_params)
+        
+        # Sign transaction
+        signed_tx = Account.sign_transaction(tx, private_key)
+        
+        # Send raw transaction
+        tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        
+        # Wait for receipt
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            # Get revert reason if possible
+            try:
+                self.contract.functions.addFileChunk(
+                    cid, bucket_id, name, encoded_chunk_size, cids, chunk_blocks_sizes, chunk_index
+                ).call({'from': from_address})
+            except Exception as e:
+                raise Exception(f"Transaction reverted: {str(e)}")
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()
 
     def commit_file(self, bucket_name: str, file_name: str, size: int, root_cid: bytes, from_address: HexAddress, private_key: str) -> None:
         """Updates the file metadata after upload using new ABI signature.
@@ -867,8 +1323,30 @@ class StorageContract:
         else:
             return self.contract.functions.getFileByName(bucket_id, file_name).call()
 
-    def get_file_index_by_id(self, call_opts: dict, file_name: str, bucket_id: bytes):
+    def get_file_index_by_id(self, call_opts: dict, bucket_name: str, file_id: bytes):
         if call_opts:
-            return self.contract.functions.getFileIndexById(file_name, bucket_id).call(call_opts)
+            return self.contract.functions.getFileIndexById(bucket_name, file_id).call(call_opts)
         else:
-            return self.contract.functions.getFileIndexById(file_name, bucket_id).call()
+            return self.contract.functions.getFileIndexById(bucket_name, file_id).call()
+
+    def is_file_filled(self, file_id: bytes) -> bool:
+        """Returns info about file status.
+        
+        Args:
+            file_id: ID of the file to check
+            
+        Returns:
+            True if file is filled, False otherwise
+        """
+        return self.contract.functions.isFileFilled(file_id).call()
+
+    def is_file_filled_v2(self, file_id: bytes) -> bool:
+        """Returns info about file status (V2 - uses loop to iterate through each chunk).
+        
+        Args:
+            file_id: ID of the file to check
+            
+        Returns:
+            True if file is filled, False otherwise
+        """
+        return self.contract.functions.isFileFilledV2(file_id).call()

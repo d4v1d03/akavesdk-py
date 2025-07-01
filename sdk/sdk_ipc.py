@@ -161,7 +161,6 @@ class IPC:
             created_at = block.timestamp
             
             return IPCBucketCreateResult(
-                id=tx,
                 name=name,
                 created_at=created_at
             )

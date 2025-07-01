@@ -226,7 +226,16 @@ class TestIPCAPI(unittest.TestCase):
         # Arrange
         bucket_name = "test-bucket"
         file_name = "test-file.txt"
-        self.mock_ipc_instance.storage.delete_file.return_value = None
+        
+        # Mock the bucket and file retrieval chain
+        mock_bucket = [b"bucket_id_123"]  # bytes32 bucket ID
+        mock_file = [b"file_id_456"]      # bytes32 file ID  
+        mock_file_index = 0
+        
+        self.mock_ipc_instance.storage.get_bucket_by_name.return_value = mock_bucket
+        self.mock_ipc_instance.storage.get_file_by_name.return_value = mock_file
+        self.mock_ipc_instance.storage.get_file_index_by_id.return_value = mock_file_index
+        self.mock_ipc_instance.storage.delete_file.return_value = "0xabcdef"
         
         # Act
         result = self.ipc_api.file_delete(None, bucket_name, file_name)
@@ -234,10 +243,11 @@ class TestIPCAPI(unittest.TestCase):
         # Assert
         self.assertIsNone(result)
         self.mock_ipc_instance.storage.delete_file.assert_called_once_with(
-            bucket_name,
+            self.mock_ipc_instance.auth,
+            mock_file[0],
+            mock_bucket[0], 
             file_name,
-            self.mock_ipc_instance.auth.address,
-            self.mock_ipc_instance.auth.key
+            mock_file_index
         )
     
     def test_file_delete_empty_names(self):
@@ -258,19 +268,22 @@ class TestIPCAPI(unittest.TestCase):
         bucket_name = "test-bucket"
         file_name = "test-file.txt"
         
-        # Mock web3 keccak function
-        mock_file_id = MagicMock()
-        mock_file_id.hex.return_value = "0xabcdef123456"
-        self.mock_ipc_instance.web3.keccak.return_value = mock_file_id
-        self.mock_ipc_instance.storage.create_file.return_value = None
+        # Mock the bucket retrieval and create_file call
+        mock_bucket = [b"bucket_id_123"]  # bytes32 bucket ID
+        self.mock_ipc_instance.storage.get_bucket_by_name.return_value = mock_bucket
+        self.mock_ipc_instance.storage.create_file.return_value = "0xabcdef123456"
         
         # Act
         result = self.ipc_api.create_file_upload(None, bucket_name, file_name)
         
         # Assert
         self.assertIsNone(result)
-        self.mock_ipc_instance.web3.keccak.assert_called_once_with(text=f"{bucket_name}/{file_name}")
-        self.mock_ipc_instance.storage.create_file.assert_called_once()
+        self.mock_ipc_instance.storage.create_file.assert_called_once_with(
+            self.mock_ipc_instance.auth.address,
+            self.mock_ipc_instance.auth.key,
+            mock_bucket[0],
+            file_name
+        )
     
     def test_create_file_upload_empty_bucket_name(self):
         """Test file upload creation with empty bucket name."""
@@ -280,19 +293,19 @@ class TestIPCAPI(unittest.TestCase):
         self.assertIn("empty bucket name", str(context.exception))
     
     def test_create_file_upload_no_web3(self):
-        """Test file upload creation when web3 instance is not available."""
+        """Test file upload creation when bucket is not found."""
         # Arrange
         bucket_name = "test-bucket"
         file_name = "test-file.txt"
         
-        # Remove web3 attribute
-        del self.mock_ipc_instance.web3
+        # Mock bucket retrieval to return None (bucket not found)
+        self.mock_ipc_instance.storage.get_bucket_by_name.return_value = None
         
         # Act & Assert
         with self.assertRaises(SDKError) as context:
             self.ipc_api.create_file_upload(None, bucket_name, file_name)
         
-        self.assertIn("Web3 instance not available", str(context.exception))
+        self.assertIn("failed to retrieve bucket", str(context.exception))
 
     def test_placeholder(self):
         """Placeholder test for IPC API."""

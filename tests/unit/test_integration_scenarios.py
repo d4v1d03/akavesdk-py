@@ -81,14 +81,17 @@ class TestIntegrationScenarios(unittest.TestCase):
         
         self.mock_client.BucketView.side_effect = mock_bucket_view
         
-        # Mock file responses
-        mock_file_response = MagicMock()
-        mock_file_response.file_name = "test-file.txt"
-        mock_file_response.name = "test-file.txt"
-        mock_file_response.root_cid = "QmTest123"
-        mock_file_response.encoded_size = 1024
-        mock_file_response.created_at.seconds = int(time.time())
-        self.mock_client.FileView.return_value = mock_file_response
+        # Mock file responses - make it dynamic based on input
+        def mock_file_view(request):
+            mock_file_response = MagicMock()
+            mock_file_response.file_name = request.file_name  # Use the requested file name
+            mock_file_response.name = request.file_name  # Use the requested file name
+            mock_file_response.root_cid = "QmTest123"
+            mock_file_response.encoded_size = 1024
+            mock_file_response.created_at.seconds = int(time.time())
+            return mock_file_response
+        
+        self.mock_client.FileView.side_effect = mock_file_view
         
         # Mock upload responses - make it dynamic based on input
         def mock_file_upload_create(request):
@@ -131,8 +134,8 @@ class TestIntegrationScenarios(unittest.TestCase):
         # 1. Create file upload
         upload = self.streaming_api.create_file_upload(None, bucket_name, file_name)
         self.assertIsInstance(upload, FileUpload)
-        self.assertEqual(upload.BucketName, bucket_name)
-        self.assertEqual(upload.Name, file_name)
+        self.assertEqual(upload.bucket_name, bucket_name)
+        self.assertEqual(upload.name, file_name)
         
         # 2. Verify file info can be retrieved
         file_info = self.ipc_api.file_info(None, bucket_name, file_name)
@@ -160,9 +163,9 @@ class TestIntegrationScenarios(unittest.TestCase):
         # Create file download
         download = self.streaming_api.create_file_download(None, bucket_name, file_name, root_cid)
         self.assertIsInstance(download, FileDownload)
-        self.assertEqual(download.BucketName, bucket_name)
-        self.assertEqual(download.Name, file_name)
-        self.assertEqual(len(download.Chunks), 1)
+        self.assertEqual(download.bucket_name, bucket_name)
+        self.assertEqual(download.name, file_name)
+        self.assertEqual(len(download.chunks), 1)
     
     def test_range_download_workflow(self):
         """Test range file download workflow."""
@@ -188,8 +191,8 @@ class TestIntegrationScenarios(unittest.TestCase):
             None, bucket_name, file_name, start_byte, end_byte
         )
         self.assertIsInstance(download, FileDownload)
-        self.assertEqual(download.BucketName, bucket_name)
-        self.assertEqual(download.Name, file_name)
+        self.assertEqual(download.bucket_name, bucket_name)
+        self.assertEqual(download.name, file_name)
     
     def test_file_listing_and_management(self):
         """Test file listing and management operations."""
@@ -270,10 +273,14 @@ class TestIntegrationScenarios(unittest.TestCase):
         
         # Simulate large file metadata
         mock_large_file = MagicMock()
+        mock_large_file.file_name = file_name
         mock_large_file.name = file_name
         mock_large_file.root_cid = "QmLargeFile123"
         mock_large_file.encoded_size = 100 * 1024 * 1024  # 100MB
         mock_large_file.created_at.seconds = int(time.time())
+        
+        # Clear the side_effect and set specific return_value for this test
+        self.mock_client.FileView.side_effect = None
         self.mock_client.FileView.return_value = mock_large_file
         
         # Get file info

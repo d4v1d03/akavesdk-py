@@ -21,7 +21,7 @@ def derive_key(key: bytes, info: bytes) -> bytes:
     return hkdf.derive(key)
 
 
-def make_gcm_cipher(origin_key: bytes, info: bytes) -> Tuple[Cipher, bytes]
+def make_gcm_cipher(origin_key: bytes, info: bytes) -> Tuple[Cipher, bytes]:
     """
     Creates a GCM cipher using the provided key and info.
     The key is derived using HKDF with SHA-256, and a random nonce is generated.

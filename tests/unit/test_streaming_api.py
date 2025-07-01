@@ -62,9 +62,9 @@ class TestStreamingAPI(unittest.TestCase):
         
         # Assert
         self.assertIsInstance(result, FileUpload)
-        self.assertEqual(result.BucketName, bucket_name)
-        self.assertEqual(result.Name, file_name)
-        self.assertEqual(result.StreamID, "stream123")
+        self.assertEqual(result.bucket_name, bucket_name)
+        self.assertEqual(result.name, file_name)
+        self.assertEqual(result.stream_id, "stream123")
         self.mock_client.FileUploadCreate.assert_called_once()
     
     def test_create_file_upload_empty_bucket_name(self):
@@ -109,11 +109,11 @@ class TestStreamingAPI(unittest.TestCase):
         
         # Assert
         self.assertIsInstance(result, FileDownload)
-        self.assertEqual(result.StreamID, "stream123")
-        self.assertEqual(result.BucketName, bucket_name)
-        self.assertEqual(result.Name, file_name)
-        self.assertEqual(len(result.Chunks), 1)
-        self.assertEqual(result.Chunks[0].CID, "chunk_cid_123")
+        self.assertEqual(result.stream_id, "stream123")
+        self.assertEqual(result.bucket_name, bucket_name)
+        self.assertEqual(result.name, file_name)
+        self.assertEqual(len(result.chunks), 1)
+        self.assertEqual(result.chunks[0].cid, "chunk_cid_123")
         self.mock_client.FileDownloadCreate.assert_called_once()
     
     def test_create_file_download_grpc_error(self):
@@ -152,10 +152,10 @@ class TestStreamingAPI(unittest.TestCase):
         
         # Assert
         self.assertIsInstance(result, FileDownload)
-        self.assertEqual(result.StreamID, "stream123")
-        self.assertEqual(result.BucketName, bucket_name)
-        self.assertEqual(result.Name, file_name)
-        self.assertEqual(len(result.Chunks), 1)
+        self.assertEqual(result.stream_id, "stream123")
+        self.assertEqual(result.bucket_name, bucket_name)
+        self.assertEqual(result.name, file_name)
+        self.assertEqual(len(result.chunks), 1)
         self.mock_client.FileDownloadRangeCreate.assert_called_once()
     
     @patch('sdk.sdk_streaming.nodeapi_pb2.StreamFileUploadChunkCreateRequest')
@@ -165,10 +165,10 @@ class TestStreamingAPI(unittest.TestCase):
         """Test successful chunk upload creation."""
         # Arrange
         file_upload = FileUpload(
-            BucketName="test-bucket",
-            Name="test-file.txt",
-            StreamID="stream123",
-            CreatedAt=None
+            bucket_name="test-bucket",
+            name="test-file.txt",
+            stream_id="stream123",
+            created_at=None
         )
         index = 0
         file_encryption_key = b"test_key" * 4  # 32 bytes
@@ -213,10 +213,10 @@ class TestStreamingAPI(unittest.TestCase):
         """Test chunk upload creation with DAG building error."""
         # Arrange
         file_upload = FileUpload(
-            BucketName="test-bucket",
-            Name="test-file.txt",
-            StreamID="stream123",
-            CreatedAt=None
+            bucket_name="test-bucket",
+            name="test-file.txt",
+            stream_id="stream123",
+            created_at=None
         )
         index = 0
         file_encryption_key = b"test_key" * 4  # 32 bytes

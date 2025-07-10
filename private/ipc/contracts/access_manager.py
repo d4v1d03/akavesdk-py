@@ -126,8 +126,51 @@ class AccessManagerContract:
         
         self.contract = web3.eth.contract(address=contract_address, abi=self.abi)
 
-    def change_public_access(self, file_id: bytes, is_public: bool, from_address: HexAddress) -> None:
-        """Changes the public access status of a file.
+    def change_public_access(self, auth, file_id: bytes, is_public: bool) -> HexStr:
+        """Changes the public access status of a file matching Go SDK signature.
+        
+        Args:
+            auth: Authentication object with address and key
+            file_id: ID of the file
+            is_public: Whether the file should be publicly accessible
+            
+        Returns:
+            Transaction hash
+        """
+        from eth_account import Account
+        
+        # Build transaction
+        function = self.contract.functions.changePublicAccess(file_id, is_public)
+        
+        # Get transaction parameters
+        tx_params = {
+            'from': auth.address,
+            'gas': 500000,
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': self.web3.eth.get_transaction_count(auth.address),
+        }
+        
+        # Build the transaction
+        tx = function.build_transaction(tx_params)
+        
+        # Sign the transaction
+        if isinstance(auth.key, str):
+            # Key is hex string, parse it
+            key_str = auth.key.replace('0x', '')
+            private_key_bytes = bytes.fromhex(key_str)
+        else:
+            # Key is already bytes
+            private_key_bytes = auth.key
+            
+        signed_tx = Account.sign_transaction(tx, private_key_bytes)
+        
+        # Send the transaction
+        tx_hash = self.web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        
+        return tx_hash.hex()
+
+    def change_public_access_simple(self, file_id: bytes, is_public: bool, from_address: HexAddress) -> None:
+        """Changes the public access status of a file (simple version that waits for receipt).
         
         Args:
             file_id: ID of the file

@@ -30,8 +30,9 @@ except ImportError:
 
 try:
     from eth_account import Account
-    from eth_account.messages import encode_structured_data
+    from eth_account.messages import encode_typed_data
     from eth_utils import to_checksum_address
+    from eth_keys import keys
 except ImportError:
     pass
 
@@ -57,59 +58,57 @@ def maybe_encrypt_metadata(value: str, derivation_path: str, encryption_key: byt
     except Exception as e:
         raise SDKError(f"failed to encrypt metadata: {str(e)}")
 
-def to_ipc_proto_chunk(chunk_cid: str, index: int, size: int, blocks):
+def to_ipc_proto_chunk(chunk_cid, index: int, size: int, blocks):
     """Convert to IPC proto chunk format matching Go implementation"""
     from private.pb import ipcnodeapi_pb2
     
     cids = []  # [][32]byte
     sizes = []  # []*big.Int (but we'll use regular ints)
     
+    # Convert chunk CID to string if it's a CID object
+    if hasattr(chunk_cid, '__str__'):
+        chunk_cid_str = str(chunk_cid)
+    else:
+        chunk_cid_str = chunk_cid
+    
     pb_blocks = []
     for block in blocks:
         block_cid = block.cid if hasattr(block, 'cid') else block["cid"]
         block_data = block.data if hasattr(block, 'data') else block["data"]
         
-        # Create protobuf block
+        if hasattr(block_cid, '__str__'):
+            block_cid_str = str(block_cid)
+        else:
+            block_cid_str = block_cid
+        
         pb_block = ipcnodeapi_pb2.IPCChunk.Block(
-            cid=block_cid,
+            cid=block_cid_str,
             size=len(block_data)
         )
         pb_blocks.append(pb_block)
         
-        # Convert CID to [32]byte for blockchain
         try:
-            # Try to decode as proper CID first
             try:
-                c = CID.decode(block_cid)
-                # Get CID bytes - try different methods based on library version
-                if hasattr(c, 'bytes'):
-                    cid_bytes = c.bytes
-                elif hasattr(c, 'encode'):
-                    cid_bytes = c.encode()
-                elif hasattr(c, 'buffer'):
-                    cid_bytes = c.buffer
+                if hasattr(block_cid, 'bytes'):
+                    cid_bytes = block_cid.bytes if callable(block_cid.bytes) else block_cid.bytes()
                 else:
-                    # Fallback: encode the string representation
-                    cid_bytes = block_cid.encode()
+                    c = CID.decode(block_cid_str)
+                    cid_bytes = c.bytes if callable(c.bytes) else c.bytes()
             except Exception:
-                # If CID decoding fails, treat as string and hash it
                 import hashlib
-                cid_bytes = hashlib.sha256(block_cid.encode()).digest()
+                cid_bytes = hashlib.sha256(block_cid_str.encode()).digest()
             
             bcid = bytearray(32)
             
-            # Ensure we have bytes, not string
             if isinstance(cid_bytes, str):
                 cid_bytes = cid_bytes.encode()
             elif not isinstance(cid_bytes, (bytes, bytearray)):
                 cid_bytes = bytes(cid_bytes)
                 
-            # Copy bytes, handling both proper CIDs and our simplified format
             if len(cid_bytes) > 4:
                 copy_len = min(len(cid_bytes) - 4, 32)
                 bcid[:copy_len] = cid_bytes[4:4+copy_len]
             else:
-                # If CID is too short, just copy what we have
                 copy_len = min(len(cid_bytes), 32)
                 bcid[:copy_len] = cid_bytes[:copy_len]
                 
@@ -118,9 +117,8 @@ def to_ipc_proto_chunk(chunk_cid: str, index: int, size: int, blocks):
         except Exception as e:
             return None, None, None, SDKError(f"failed to process CID: {str(e)}")
     
-    # Create protobuf chunk matching Go version
     proto_chunk = ipcnodeapi_pb2.IPCChunk(
-        cid=chunk_cid,
+        cid=chunk_cid_str,
         index=index,
         size=size,
         blocks=pb_blocks
@@ -528,7 +526,7 @@ class IPC:
                 except Exception as e:
                     chunk_processing_error = SDKError(f"chunk reader error: {str(e)}")
                 finally:
-                    file_upload_chunks_queue.put(None)  # Signal completion
+                    file_upload_chunks_queue.put(None)  
             
             import threading
             chunk_reader_thread = threading.Thread(target=chunk_reader)
@@ -602,7 +600,6 @@ class IPC:
                     if is_filled:
                         break
                 except Exception as e:
-                    # If is_file_filled method doesn't exist, wait a bit and assume filled
                     logging.warning(f"IsFileFilled check failed: {e}, assuming file is filled")
                     time.sleep(2)
                     break
@@ -610,11 +607,9 @@ class IPC:
                 if time.time() - wait_start > max_wait_time:
                     raise SDKError("timeout waiting for file to be filled")
                 
-                time.sleep(1)  # Wait 1 second like Go implementation
+                time.sleep(1)  
             
-            # Commit file
             try:
-                # Convert CID to bytes for storage contract
                 if hasattr(root_cid, 'bytes'):
                     root_cid_bytes = root_cid.bytes
                 elif hasattr(root_cid, 'encode'):
@@ -665,120 +660,63 @@ class IPC:
         except Exception as e:
             raise SDKError(f"Failed to calculate file ID: {str(e)}")
 
-    def _convert_cid_to_bytes(self, cid_input) -> bytes:
-        """Convert CID object/string to bytes, matching Go chunkDAG.CID.Bytes() method"""
-        
-        # Handle CID object first (matching Go chunkDAG.CID.Bytes())
-        if hasattr(cid_input, 'bytes') and callable(cid_input.bytes):
-            # This is a CID object with bytes() method - call it like Go
+    def _convert_cid_to_bytes(self, cid_input) -> bytes:      
+        if hasattr(cid_input, 'bytes'):
             try:
-                return cid_input.bytes()
+                if callable(cid_input.bytes):
+                    return cid_input.bytes()
+                else:
+                    return bytes(cid_input.bytes)
             except Exception as e:
-                logging.warning(f"Failed to call .bytes() on CID object: {e}")
-        elif hasattr(cid_input, 'bytes') and not callable(cid_input.bytes):
-            # This is a CID object with bytes property 
+                logging.warning(f"Failed to access .bytes on CID object: {e}")
+        elif hasattr(cid_input, '__bytes__'):
             try:
-                return cid_input.bytes
+                return bytes(cid_input)
             except Exception as e:
-                logging.warning(f"Failed to access .bytes property on CID object: {e}")
+                logging.warning(f"Failed to call __bytes__ on CID object: {e}")
         elif hasattr(cid_input, 'encode') and callable(cid_input.encode):
-            # Alternative CID object with encode() method
             try:
-                return cid_input.encode()
+                result = cid_input.encode()
+                if isinstance(result, bytes):
+                    return result
+                return result.encode() if isinstance(result, str) else bytes(result)
             except Exception as e:
                 logging.warning(f"Failed to call .encode() on CID object: {e}")
-        elif hasattr(cid_input, 'buffer'):
-            # Alternative CID object with buffer property
-            try:
-                return cid_input.buffer
-            except Exception as e:
-                logging.warning(f"Failed to access .buffer property on CID object: {e}")
         
-        # If it's a string, convert to string first
         if not isinstance(cid_input, str):
             cid_str = str(cid_input)
         else:
             cid_str = cid_input
             
-        # Try to decode using CID library
         try:
-            cid_obj = CID.decode(cid_str)
-            if hasattr(cid_obj, 'bytes'):
-                if callable(cid_obj.bytes):
-                    return cid_obj.bytes()
-                else:
-                    return cid_obj.bytes
-            elif hasattr(cid_obj, 'encode'):
-                return cid_obj.encode()
-            elif hasattr(cid_obj, 'buffer'):
-                return cid_obj.buffer
-            else:
-                raise Exception("CID object has no bytes method")
+            from multiformats import CID as CIDLib
+            cid_obj = CIDLib.decode(cid_str)
+            return self._convert_cid_to_bytes(cid_obj)
         except Exception as e:
             logging.warning(f"Failed to decode CID using library: {e}")
             
-            # Manual CID decoding - handle different CID formats
-            try:
-                # CIDv1 with base32 encoding (starts with 'b' for base32)
-                if cid_str.startswith('baf'):
-                    # Remove the multibase prefix and decode base32
-                    import base64
-                    # Remove first character (multibase prefix)
-                    b32_data = cid_str[1:].upper()
-                    # Add padding if needed
-                    missing_padding = 8 - len(b32_data) % 8
-                    if missing_padding != 8:
-                        b32_data += '=' * missing_padding
-                    try:
-                        return base64.b32decode(b32_data)
-                    except Exception:
-                        pass
-                
-                # CIDv0 with base58 encoding (starts with 'Qm')
-                elif cid_str.startswith('Qm'):
-                    try:
-                        import base58
-                        return base58.b58decode(cid_str)
-                    except ImportError:
-                        pass
-                    except Exception:
-                        pass
-                
-                # If all else fails, create a deterministic hash
-                import hashlib
-                return hashlib.sha256(cid_str.encode()).digest()
-                
-            except Exception:
-                # Final fallback - deterministic hash of the CID string
-                import hashlib
-                return hashlib.sha256(cid_str.encode()).digest()
+            import hashlib
+            return hashlib.sha256(cid_str.encode()).digest()
 
     def create_chunk_upload(self, ctx, index: int, file_encryption_key: bytes, data: bytes, bucket_id: bytes, file_name: str) -> IPCFileChunkUploadV2:
         try:
-            # Encryption step - matching Go implementation
             if len(file_encryption_key) > 0:
                 data = encrypt(file_encryption_key, data, str(index).encode())
             
             size = len(data)
             
-            # Calculate block size - matching Go implementation
             block_size = BlockSize
             if self.erasure_code:
-                # Apply erasure coding first
                 data = self.erasure_code.encode(data)
-                # Calculate shard size (equivalent to Go's blockSize calculation)
                 blocks_count = self.erasure_code.data_blocks + self.erasure_code.parity_blocks
                 block_size = len(data) // blocks_count
             
-            # Build chunk DAG using the proper build_dag function
             chunk_dag = build_dag(ctx, io.BytesIO(data), block_size, None)
             if chunk_dag is None:
                 raise SDKError("build_dag returned None")
             
-            # Convert chunk CID to string if needed
             chunk_cid_str = chunk_dag.cid if isinstance(chunk_dag.cid, str) else str(chunk_dag.cid)
             
-            # Convert to IPC proto chunk format
             cids, sizes, proto_chunk, error = to_ipc_proto_chunk(
                 chunk_cid_str,
                 index,
@@ -791,37 +729,28 @@ class IPC:
             if proto_chunk is None:
                 raise SDKError("to_ipc_proto_chunk returned None proto_chunk")
             
-            # Create gRPC request
             request = ipcnodeapi_pb2.IPCFileUploadChunkCreateRequest(
                 chunk=proto_chunk,
                 bucket_id=bucket_id,  # bytes
                 file_name=file_name
             )
             
-            # Call gRPC API
             response = self.client.FileUploadChunkCreate(request)
             if response is None:
                 raise SDKError("gRPC response is None")
             
-            # Validate response
             if len(response.blocks) != len(chunk_dag.blocks):
                 raise SDKError(f"received unexpected amount of blocks {len(response.blocks)}, expected {len(chunk_dag.blocks)}")
             
-            # Update blocks with upload information from response
             for i, upload in enumerate(response.blocks):
                 if chunk_dag.blocks[i].cid != upload.cid:
                     raise SDKError(f"block CID mismatch at position {i}")
-                # Update block with node information
                 chunk_dag.blocks[i].node_address = upload.node_address
                 chunk_dag.blocks[i].node_id = upload.node_id
                 chunk_dag.blocks[i].permit = upload.permit
             
-            # Call blockchain AddFileChunk like Go version  
-            # Convert chunk CID to bytes for blockchain - matches Go chunkDAG.CID.Bytes()
             chunk_cid_bytes = self._convert_cid_to_bytes(chunk_dag.cid)
             
-            # Add file chunk to blockchain (like Go's AddFileChunk)
-            # Python signature: add_file_chunk(from_address, private_key, cid, bucket_id, name, encoded_chunk_size, cids, chunk_blocks_sizes, chunk_index)
             tx = self.ipc.storage.add_file_chunk(
                 self.ipc.auth.address,      # from_address: HexAddress
                 self.ipc.auth.key,          # private_key: str
@@ -834,8 +763,12 @@ class IPC:
                 index                       # chunk_index: int (chunk index)
             )
             
-            # The add_file_chunk method already waits for transaction completion and handles receipt checking
-            # tx contains the transaction hash if successful
+            if hasattr(self.ipc, 'wait_for_tx') and hasattr(tx, 'hex'):
+                self.ipc.wait_for_tx(tx.hex())
+            elif hasattr(self.ipc, 'web3') and hasattr(self.ipc.web3.eth, 'wait_for_transaction_receipt'):
+                receipt = self.ipc.web3.eth.wait_for_transaction_receipt(tx)
+                if receipt.status != 1:
+                    raise SDKError("AddFileChunk transaction failed")
             
             return IPCFileChunkUploadV2(
                 index=index,
@@ -855,7 +788,6 @@ class IPC:
             pool = ConnectionPool()
             
             try:
-                # Handle CID string conversion
                 chunk_cid_str = file_chunk_upload.chunk_cid
                 if hasattr(file_chunk_upload.chunk_cid, 'string'):
                     chunk_cid_str = file_chunk_upload.chunk_cid.string()
@@ -903,31 +835,40 @@ class IPC:
 
     def _upload_block(self, ctx, pool: ConnectionPool, block_index: int, block, proto_chunk, bucket_id, file_name: str) -> None:
         try:
-            # Handle both dict and object formats for block
             node_address = block.node_address if hasattr(block, 'node_address') else block["node_address"]
             block_data_bytes = block.data if hasattr(block, 'data') else block["data"]
             block_cid = block.cid if hasattr(block, 'cid') else block["cid"]
             node_id = block.node_id if hasattr(block, 'node_id') else block["node_id"]
             
-            client, closer, err = pool.create_ipc_client(node_address, self.use_connection_pool)
-            if err:
-                raise SDKError(f"failed to create client: {str(err)}")
+            if isinstance(block_data_bytes, memoryview):
+                block_data_bytes = bytes(block_data_bytes)
+            
+            if not node_address or not node_address.strip():
+                raise SDKError(f"Invalid node address for block {block_cid}: '{node_address}'")
+            
+            logging.debug(f"Uploading block {block_index}: CID={block_cid}, node={node_address}")
+            
+            result = pool.create_ipc_client(node_address, self.use_connection_pool)
+            
+            if len(result) == 3:
+                client, closer, err = result
+                if err:
+                    raise SDKError(f"failed to create client: {str(err)}")
+                if client is None:
+                    raise SDKError(f"failed to create client: client is None")
+            else:
+                raise SDKError(f"Unexpected return format from create_ipc_client: {result}")
             
             try:
-                # Create streaming uploader matching Go implementation
                 def upload_streaming():
-                    # Start streaming upload
                     def message_generator():
-                        # Generate nonce
-                        nonce = secrets.randbits(256)
+                        nonce = secrets.randbits(256) 
                         
-                        # Create signature following EIP712 standard like Go version
                         signature_hex, nonce_bytes = self._create_storage_signature(
                             proto_chunk.cid, block_cid, proto_chunk.index, 
                             block_index, node_id, nonce
                         )
                         
-                        # Upload block data in segments matching Go uploadIPCBlockSegments
                         data_len = len(block_data_bytes)
                         if data_len == 0:
                             return
@@ -939,7 +880,9 @@ class IPC:
                             end = min(i + self.block_part_size, data_len)
                             segment_data = block_data_bytes[i:end]
                             
-                            # Create block data matching Go IPCFileBlockData structure
+                            if isinstance(segment_data, memoryview):
+                                segment_data = bytes(segment_data)
+                            
                             block_data = ipcnodeapi_pb2.IPCFileBlockData(
                                 data=segment_data,
                                 cid=block_cid if is_first_part else "",  # Only send CID in first part
@@ -955,136 +898,102 @@ class IPC:
                             yield block_data
                             
                             i = end
-                            is_first_part = False  # Clear fields for subsequent parts like Go
+                            is_first_part = False  
                     
                     try:
-                        # Execute streaming upload
                         response = client.FileUploadBlock(message_generator())
+                        logging.debug(f"Block {block_cid} upload completed successfully")
                         return response
                     except Exception as e:
                         raise SDKError(f"streaming upload failed: {str(e)}")
                 
-                # Execute streaming upload
                 upload_streaming()
                     
             finally:
                 if closer:
-                    closer()
-                    
+                    try:
+                        closer()
+                    except Exception as e:
+                        logging.warning(f"Failed to close connection for block {block_cid}: {e}")
+                        
         except Exception as err:
             block_cid = block.cid if hasattr(block, 'cid') else block["cid"]
             raise SDKError(f"failed to upload block {block_cid}: {str(err)}")
     
     def _create_storage_signature(self, chunk_cid: str, block_cid: str, chunk_index: int, 
                                  block_index: int, node_id: str, nonce: int) -> tuple:
-        """Create EIP712 signature for storage operation matching Go implementation"""
         try:
-            # Generate nonce bytes
+            from private.eip712 import sign, Domain, TypedData
             nonce_bytes = nonce.to_bytes(32, byteorder='big')
-            
-            # Decode CIDs to get proper byte representations
             chunk_cid_obj = CID.decode(chunk_cid)
             block_cid_obj = CID.decode(block_cid)
             
-            # Get chunk CID bytes
-            if hasattr(chunk_cid_obj, 'bytes'):
-                chunk_cid_bytes = chunk_cid_obj.bytes
-            elif hasattr(chunk_cid_obj, 'encode'):
-                chunk_cid_bytes = chunk_cid_obj.encode()
-            elif hasattr(chunk_cid_obj, 'buffer'):
-                chunk_cid_bytes = chunk_cid_obj.buffer
-            else:
-                chunk_cid_bytes = chunk_cid.encode()
+            chunk_cid_bytes = self._convert_cid_to_bytes(chunk_cid_obj)
             
-            # Get block CID bytes and create 32-byte block CID (matching Go bcid [32]byte)
-            if hasattr(block_cid_obj, 'bytes'):
-                block_cid_bytes = block_cid_obj.bytes
-            elif hasattr(block_cid_obj, 'encode'):
-                block_cid_bytes = block_cid_obj.encode()
-            elif hasattr(block_cid_obj, 'buffer'):
-                block_cid_bytes = block_cid_obj.buffer
-            else:
-                block_cid_bytes = block_cid.encode()
+            block_cid_bytes = self._convert_cid_to_bytes(block_cid_obj)
             
-            # Create 32-byte block CID (matching Go bcid [32]byte)
             bcid = bytearray(32)
-            
-            # Ensure we have bytes, not string
-            if isinstance(block_cid_bytes, str):
-                block_cid_bytes = block_cid_bytes.encode()
-            elif not isinstance(block_cid_bytes, (bytes, bytearray)):
-                block_cid_bytes = bytes(block_cid_bytes)
-            
-            # Copy bytes from position 4 to match Go: copy(bcid[:], blockCid.Bytes()[4:])
             if len(block_cid_bytes) > 4:
                 copy_len = min(len(block_cid_bytes) - 4, 32)
                 bcid[:copy_len] = block_cid_bytes[4:4+copy_len]
             else:
                 copy_len = min(len(block_cid_bytes), 32)
                 bcid[:copy_len] = block_cid_bytes[:copy_len]
-            
-            # Prepare node ID bytes - handle libp2p peer ID properly
+           
             try:
-                # Try to decode as libp2p peer ID first
-                from libp2p.peer.id import ID as PeerID
-                peer_id = PeerID.from_base58(node_id) if isinstance(node_id, str) else node_id
-                node_id_bytes = peer_id.to_bytes() if hasattr(peer_id, 'to_bytes') else node_id.encode()
-            except:
-                # Fallback to simple encoding
+                import base58
+                actual_node_id = node_id
+                
+                try:
+                    if actual_node_id.startswith('12D3'):
+                        decoded = base58.b58decode(actual_node_id)
+                        node_id_bytes = decoded
+                    else:
+                        node_id_bytes = actual_node_id.encode() if isinstance(actual_node_id, str) else actual_node_id
+                except Exception:
+                    node_id_bytes = actual_node_id.encode() if isinstance(actual_node_id, str) else actual_node_id
+            except ImportError:
                 node_id_bytes = node_id.encode() if isinstance(node_id, str) else node_id
             
-            # Ensure chunk_cid_bytes is proper bytes format
-            if isinstance(chunk_cid_bytes, str):
-                chunk_cid_bytes = chunk_cid_bytes.encode()
-            elif not isinstance(chunk_cid_bytes, (bytes, bytearray)):
-                chunk_cid_bytes = bytes(chunk_cid_bytes)
+            domain = Domain(
+                name="Storage",
+                version="1",
+                chain_id=int(self.ipc.web3.eth.chain_id) if hasattr(self.ipc, 'web3') and hasattr(self.ipc.web3, 'eth') else 80244,
+                verifying_contract=self.ipc.storage.contract_address if hasattr(self.ipc, 'storage') and hasattr(self.ipc.storage, 'contract_address') else "0x9Aa8ff1604280d66577ecB5051a3833a983Ca3aF"
+            )
             
-            # Create EIP712 message matching Go version
-            message = {
-                "chunkCID": chunk_cid_bytes,
-                "blockCID": bytes(bcid),
-                "chunkIndex": chunk_index,
-                "blockIndex": block_index,
-                "nodeId": node_id_bytes,
-                "nonce": nonce
-            }
-            
-            # EIP712 types matching Go version
-            types = {
+            data_types = {
                 "StorageData": [
-                    {"name": "chunkCID", "type": "bytes"},
-                    {"name": "blockCID", "type": "bytes32"},
-                    {"name": "chunkIndex", "type": "uint256"},
-                    {"name": "blockIndex", "type": "uint8"},
-                    {"name": "nodeId", "type": "bytes"},
-                    {"name": "nonce", "type": "uint256"}
+                    TypedData("chunkCID", "bytes"),
+                    TypedData("blockCID", "bytes32"), 
+                    TypedData("chunkIndex", "uint256"),
+                    TypedData("blockIndex", "uint8"),
+                    TypedData("nodeId", "bytes"),
+                    TypedData("nonce", "uint256")
                 ]
             }
             
-            # EIP712 domain matching Go version
-            domain = {
-                "name": "Storage",
-                "version": "1", 
-                "chainId": int(self.ipc.chain_id) if hasattr(self.ipc, 'chain_id') else 1,
-                "verifyingContract": self.ipc.storage_address if hasattr(self.ipc, 'storage_address') else "0x0000000000000000000000000000000000000000"
+            data_message = {
+                "chunkCID": bytes(chunk_cid_bytes),     
+                "blockCID": bytes(bcid),                
+                "chunkIndex": chunk_index,             
+                "blockIndex": block_index,           
+                "nodeId": bytes(node_id_bytes),       
+                "nonce": nonce                          
             }
+            if isinstance(self.ipc.auth.key, bytes):
+                private_key_bytes = self.ipc.auth.key
+            else:
+                key_str = str(self.ipc.auth.key).replace('0x', '')
+                private_key_bytes = bytes.fromhex(key_str)
             
-            # Create structured data
-            structured_data = {
-                "types": types,
-                "primaryType": "StorageData",
-                "domain": domain,
-                "message": message
-            }
+            logging.debug(f"Private key bytes length: {len(private_key_bytes)}")
             
-            # Sign with private key
-            try:
-                encoded_data = encode_structured_data(structured_data)
-                account = Account.from_key(self.ipc.auth.key)
-                signed_message = account.sign_message(encoded_data)
-                signature_hex = signed_message.signature.hex()
-            except Exception as e:
-                raise SDKError(f"EIP712 signing failed: {str(e)}")
+            signature_bytes = sign(private_key_bytes, domain, data_message, data_types)
+            signature_hex = signature_bytes.hex()
+            
+            logging.debug(f"[PYTHON_UPLOAD_SIGNATURE] Generated signature: {signature_hex}")
+            logging.debug(f"[PYTHON_UPLOAD_SIGNATURE] Signature length: {len(signature_hex)}")
             
             return signature_hex, nonce_bytes
             
@@ -1104,7 +1013,7 @@ class IPC:
         block
     ) -> bytes:
         try:
-            if not hasattr(block, 'akave') or not block.akave and not hasattr(block, 'filecoin') or not block.filecoin:
+            if (not hasattr(block, 'akave') or not block.akave) and (not hasattr(block, 'filecoin') or not block.filecoin):
                 raise SDKError("missing block metadata")
             
             client, closer, err = pool.create_ipc_client(block.akave.node_address, self.use_connection_pool)
@@ -1112,34 +1021,26 @@ class IPC:
                 raise SDKError(f"failed to create client: {str(err)}")
             
             try:
-                download_req = {
-                    "chunk_cid": chunk_cid,
-                    "chunk_index": chunk_index,
-                    "block_cid": block.cid,
-                    "block_index": block_index,
-                    "bucket_name": bucket_name,
-                    "file_name": file_name,
-                    "address": address
-                }
+                download_req = ipcnodeapi_pb2.IPCFileDownloadBlockRequest(
+                    chunk_cid=chunk_cid,
+                    chunk_index=chunk_index,
+                    block_cid=block.cid,
+                    block_index=block_index,
+                    bucket_name=bucket_name,
+                    file_name=file_name,
+                    address=address
+                )
                 
-                download_client = client.file_download_block(ctx, download_req)
+                download_client = client.FileDownloadBlock(download_req)
                 if not download_client:
                     raise SDKError("failed to get download client")
                 
                 buffer = io.BytesIO()
                 
-                while True:
-                    try:
-                        block_data = download_client.recv()
-                        if not block_data:
-                            break
-                        buffer.write(block_data.data)
-                    except EOFError:
+                for block_data in download_client:
+                    if not block_data:
                         break
-                    except Exception as e:
-                        if isinstance(e, io.EOF):
-                            break
-                        raise SDKError(f"error receiving block data: {str(e)}")
+                    buffer.write(block_data.data)
                 
                 return buffer.getvalue()
             finally:
@@ -1158,6 +1059,9 @@ class IPC:
                 
             if not file_name:
                 raise SDKError("empty file name")
+            
+            file_name = maybe_encrypt_metadata(file_name, bucket_name + "/" + file_name, self.encryption_key)
+            bucket_name = maybe_encrypt_metadata(bucket_name, bucket_name, self.encryption_key)
                 
             request = ipcnodeapi_pb2.IPCFileDownloadCreateRequest(
                 bucket_name=bucket_name,
@@ -1168,12 +1072,12 @@ class IPC:
             response = self.client.FileDownloadCreate(request)
             
             chunks = []
-            for chunk in response.chunks:
+            for i, chunk in enumerate(response.chunks):
                 chunks.append(Chunk(
                     cid=chunk.cid,
                     encoded_size=chunk.encoded_size,
                     size=chunk.size,
-                    index=chunk.index
+                    index=i 
                 ))
             
             return IPCFileDownload(
@@ -1183,6 +1087,105 @@ class IPC:
             )
         except Exception as err:
             raise SDKError(f"failed to create file download: {str(err)}")
+    
+    def create_range_file_download(self, ctx, bucket_name: str, file_name: str, start: int, end: int):
+        try:
+            if not bucket_name:
+                raise SDKError("empty bucket name")
+                
+            if not file_name:
+                raise SDKError("empty file name")
+                
+            file_name = maybe_encrypt_metadata(file_name, bucket_name + "/" + file_name, self.encryption_key)
+            bucket_name = maybe_encrypt_metadata(bucket_name, bucket_name, self.encryption_key)
+                
+            request = ipcnodeapi_pb2.IPCFileDownloadRangeCreateRequest(
+                bucket_name=bucket_name,
+                file_name=file_name,
+                address=self.ipc.auth.address,
+                start_index=start,
+                end_index=end
+            )
+            
+            response = self.client.FileDownloadRangeCreate(request)
+            
+            chunks = []
+            for i, chunk in enumerate(response.chunks):
+                chunks.append(Chunk(
+                    cid=chunk.cid,
+                    encoded_size=chunk.encoded_size,
+                    size=chunk.size,
+                    index=i + start  
+                ))
+            
+            return IPCFileDownload(
+                bucket_name=response.bucket_name,
+                name=file_name,
+                chunks=chunks
+            )
+        except Exception as err:
+            raise SDKError(f"failed to create range file download: {str(err)}")
+
+    def file_set_public_access(self, ctx, bucket_name: str, file_name: str, is_public: bool) -> None:
+        try:
+            if not bucket_name:
+                raise SDKError("empty bucket name")
+            if not file_name:
+                raise SDKError("empty file name")
+                
+            original_file_name = file_name
+            original_bucket_name = bucket_name
+            
+            file_name = maybe_encrypt_metadata(file_name, bucket_name + "/" + file_name, self.encryption_key)
+            bucket_name = maybe_encrypt_metadata(bucket_name, bucket_name, self.encryption_key)
+            
+            try:
+                bucket = self.ipc.storage.get_bucket_by_name(
+                    {"from": self.ipc.auth.address},
+                    bucket_name
+                )
+                if not bucket:
+                    raise SDKError("failed to retrieve bucket")
+            except Exception as e:
+                raise SDKError(f"failed to get bucket: {str(e)}")
+            
+            try:
+                file = self.ipc.storage.get_file_by_name(
+                    {},
+                    bucket[0],  # bucket ID
+                    file_name
+                )
+                if not file:
+                    raise SDKError("failed to retrieve file")
+            except Exception as e:
+                raise SDKError(f"failed to get file: {str(e)}")
+            
+            if not hasattr(self.ipc, 'access_manager') or self.ipc.access_manager is None:
+                raise SDKError("access manager not available")
+            
+            try:
+                tx_hash = self.ipc.access_manager.change_public_access(
+                    self.ipc.auth,  # auth object
+                    file[0],        # file ID
+                    is_public       # is_public flag
+                )
+                
+                if hasattr(self.ipc, 'wait_for_tx'):
+                    self.ipc.wait_for_tx(tx_hash)
+                elif hasattr(self.ipc, 'web3') and hasattr(self.ipc.web3.eth, 'wait_for_transaction_receipt'):
+                    receipt = self.ipc.web3.eth.wait_for_transaction_receipt(tx_hash)
+                    if receipt.status != 1:
+                        raise SDKError("ChangePublicAccess transaction failed")
+                
+                logging.info(f"Successfully {'enabled' if is_public else 'disabled'} public access for file '{original_file_name}' in bucket '{original_bucket_name}', tx_hash: {tx_hash}")
+                return None
+                
+            except Exception as e:
+                raise SDKError(f"failed to change public access: {str(e)}")
+                
+        except Exception as err:
+            logging.error(f"IPC file_set_public_access failed: {err}")
+            raise SDKError(f"failed to set public access: {str(err)}")
             
     def download(self, ctx, file_download, writer: io.IOBase):
         try:

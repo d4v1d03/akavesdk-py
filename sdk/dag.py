@@ -62,14 +62,15 @@ class DAGRoot:
             
         if IPLD_AVAILABLE:
             try:
-                cid_obj = CID.decode(cid_str)
+                cid_obj = CID.decode(cid_str) if isinstance(cid_str, str) else chunk_cid
             except:
                 cid_obj = cid_str
         else:
             cid_obj = cid_str
             
         self.links.append({
-            "cid": cid_obj,
+            "cid": cid_obj,      # Store CID object for PBLink
+            "cid_str": cid_str,  # Store string for other uses
             "name": "",  
             "size": proto_node_size
         })
@@ -81,7 +82,10 @@ class DAGRoot:
             raise DAGError("no chunks added")
         
         if len(self.links) == 1:
-            return self.links[0]["cid"]
+            link_cid = self.links[0]["cid"]
+            if "cid_str" in self.links[0]:
+                return self.links[0]["cid_str"]
+            return link_cid
         
         if not IPLD_AVAILABLE:
             import base64
@@ -91,12 +95,22 @@ class DAGRoot:
         try:
             pb_links = []
             for link in self.links:
+                link_cid = link["cid"]
+                if isinstance(link_cid, str):
+                    try:
+                        link_cid = CID.decode(link_cid)
+                    except Exception:
+                        continue
+                
                 pb_link = PBLink(
-                    name="", 
-                    cid=link["cid"],
+                    hash=link_cid,
+                    name=link["name"], 
                     size=link["size"]
                 )
                 pb_links.append(pb_link)
+            
+            if not pb_links:
+                raise DAGError("no valid CIDs found for DAG links")
             
             unixfs_data = self._create_unixfs_file_data()
             pb_node = PBNode(data=unixfs_data, links=pb_links)
@@ -208,12 +222,13 @@ def _create_unixfs_file_node(data: bytes):
         return f"bafybeig{b32_hash[:50]}", data
     
     try:
-        unixfs_data = bytes([0x08, 0x02])  # type = file
+        unixfs_data = bytes([0x08, 0x02])  
         
         if len(data) > 0:
             unixfs_data += bytes([0x22]) + _encode_varint(len(data)) + data
-            pb_node = PBNode(data=unixfs_data, links=[])
-            encoded_bytes = encode(pb_node)
+        
+        pb_node = PBNode(data=unixfs_data, links=[])
+        encoded_bytes = encode(pb_node)
         
         digest = multihash.digest(encoded_bytes, "sha2-256")
         cid = CID("base32", 1, dag_pb_code, digest)
@@ -221,7 +236,6 @@ def _create_unixfs_file_node(data: bytes):
         return cid, encoded_bytes
         
     except Exception as e:
-        # Fallback
         hash_digest = hashlib.sha256(data).digest()
         import base64
         b32_hash = base64.b32encode(hash_digest).decode().lower().rstrip('=')
@@ -262,8 +276,8 @@ def _create_chunk_dag_node(blocks: List[FileBlockUpload]):
         for i, block in enumerate(blocks):
             block_cid = CID.decode(block.cid) if isinstance(block.cid, str) else block.cid
             pb_link = PBLink(
-                name="",  # Empty name for data blocks
-                cid=block_cid,
+                hash=block_cid,  # Use 'hash' not 'cid'
+                name="",         # Empty name for data blocks
                 size=len(block.data)
             )
             pb_links.append(pb_link)
@@ -326,7 +340,6 @@ def extract_block_data(cid_str: str, data: bytes) -> bytes:
 
 def _extract_unixfs_data(unixfs_bytes: bytes) -> bytes:
     try:
-       
         offset = 0
         while offset < len(unixfs_bytes):
             if offset >= len(unixfs_bytes):
@@ -335,7 +348,10 @@ def _extract_unixfs_data(unixfs_bytes: bytes) -> bytes:
             field_tag = unixfs_bytes[offset]
             offset += 1
             
-            if field_tag == 0x22:  # Field 4 (Data)
+            field_number = (field_tag >> 3)
+            wire_type = field_tag & 0x07
+            
+            if field_number == 4 and wire_type == 2:  # Field 4 (Data) with length-delimited wire type
                 length, bytes_read = _decode_varint(unixfs_bytes[offset:])
                 offset += bytes_read
                 
@@ -343,11 +359,19 @@ def _extract_unixfs_data(unixfs_bytes: bytes) -> bytes:
                     return unixfs_bytes[offset:offset + length]
                 else:
                     break
-            elif field_tag & 0x07 == 2:  # Length-delimited field
+            elif wire_type == 2:  # Length-delimited field
                 length, bytes_read = _decode_varint(unixfs_bytes[offset:])
                 offset += bytes_read + length
+            elif wire_type == 0:  # Varint
+                value, bytes_read = _decode_varint(unixfs_bytes[offset:])
+                offset += bytes_read
+            elif wire_type == 1:  # Fixed64
+                offset += 8
+            elif wire_type == 5:  # Fixed32
+                offset += 4
             else:
                 offset += 1
+        
         return b""
         
     except Exception:

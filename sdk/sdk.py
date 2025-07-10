@@ -54,7 +54,7 @@ class AkaveContractFetcher:
             
             contract_info = {
                 'dial_uri': response.dial_uri if hasattr(response, 'dial_uri') else None,
-                'contract_address': response.contract_address if hasattr(response, 'contract_address') else None,
+                'contract_address': response.storage_address if hasattr(response, 'storage_address') else None,
             }
             
             if hasattr(response, 'access_address'):
@@ -90,7 +90,6 @@ class SDK:
         self.parity_blocks_count = parity_blocks_count
         self.ipc_address = ipc_address or address  # Use provided IPC address or fallback to main address
         
-        # Cache for dynamically fetched contract info
         self._contract_info = None
 
         if self.block_part_size <= 0 or self.block_part_size > BLOCK_SIZE:
@@ -126,8 +125,6 @@ class SDK:
         if self._contract_info:
             return self._contract_info
             
-        # Try multiple endpoints for contract fetching
-        # TEMPORARILY DISABLED connect.akave.ai due to DNS issues
         endpoints = [
             'yucca.akave.ai:5500',
             # 'connect.akave.ai:5500'  # DNS resolution failing

@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from private.pb import ipcnodeapi_pb2 as ipcnodeapi__pb2      
+from private.pb import ipcnodeapi_pb2 as ipcnodeapi__pb2
 
 GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__
@@ -79,6 +79,11 @@ class IPCNodeAPIStub(object):
                 request_serializer=ipcnodeapi__pb2.IPCFileDownloadCreateRequest.SerializeToString,
                 response_deserializer=ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
                 _registered_method=True)
+        self.FileDownloadRangeCreate = channel.unary_unary(
+                '/ipcnodeapi.IPCNodeAPI/FileDownloadRangeCreate',
+                request_serializer=ipcnodeapi__pb2.IPCFileDownloadRangeCreateRequest.SerializeToString,
+                response_deserializer=ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
+                _registered_method=True)
         self.FileDownloadChunkCreate = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileDownloadChunkCreate',
                 request_serializer=ipcnodeapi__pb2.IPCFileDownloadChunkCreateRequest.SerializeToString,
@@ -94,10 +99,20 @@ class IPCNodeAPIStub(object):
                 request_serializer=ipcnodeapi__pb2.IPCFileListRequest.SerializeToString,
                 response_deserializer=ipcnodeapi__pb2.IPCFileListResponse.FromString,
                 _registered_method=True)
+        self.FileListChunks = channel.unary_unary(
+                '/ipcnodeapi.IPCNodeAPI/FileListChunks',
+                request_serializer=ipcnodeapi__pb2.IPCFileListChunksRequest.SerializeToString,
+                response_deserializer=ipcnodeapi__pb2.IPCFileListChunksResponse.FromString,
+                _registered_method=True)
         self.FileDelete = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileDelete',
                 request_serializer=ipcnodeapi__pb2.IPCFileDeleteRequest.SerializeToString,
                 response_deserializer=ipcnodeapi__pb2.IPCFileDeleteResponse.FromString,
+                _registered_method=True)
+        self.FileUploadBlockUnary = channel.unary_unary(
+                '/ipcnodeapi.IPCNodeAPI/FileUploadBlockUnary',
+                request_serializer=ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
+                response_deserializer=ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
                 _registered_method=True)
 
 
@@ -160,6 +175,12 @@ class IPCNodeAPIServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def FileDownloadRangeCreate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def FileDownloadChunkCreate(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -178,7 +199,19 @@ class IPCNodeAPIServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def FileListChunks(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def FileDelete(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FileUploadBlockUnary(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -232,6 +265,11 @@ def add_IPCNodeAPIServicer_to_server(servicer, server):
                     request_deserializer=ipcnodeapi__pb2.IPCFileDownloadCreateRequest.FromString,
                     response_serializer=ipcnodeapi__pb2.IPCFileDownloadCreateResponse.SerializeToString,
             ),
+            'FileDownloadRangeCreate': grpc.unary_unary_rpc_method_handler(
+                    servicer.FileDownloadRangeCreate,
+                    request_deserializer=ipcnodeapi__pb2.IPCFileDownloadRangeCreateRequest.FromString,
+                    response_serializer=ipcnodeapi__pb2.IPCFileDownloadCreateResponse.SerializeToString,
+            ),
             'FileDownloadChunkCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDownloadChunkCreate,
                     request_deserializer=ipcnodeapi__pb2.IPCFileDownloadChunkCreateRequest.FromString,
@@ -247,10 +285,20 @@ def add_IPCNodeAPIServicer_to_server(servicer, server):
                     request_deserializer=ipcnodeapi__pb2.IPCFileListRequest.FromString,
                     response_serializer=ipcnodeapi__pb2.IPCFileListResponse.SerializeToString,
             ),
+            'FileListChunks': grpc.unary_unary_rpc_method_handler(
+                    servicer.FileListChunks,
+                    request_deserializer=ipcnodeapi__pb2.IPCFileListChunksRequest.FromString,
+                    response_serializer=ipcnodeapi__pb2.IPCFileListChunksResponse.SerializeToString,
+            ),
             'FileDelete': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDelete,
                     request_deserializer=ipcnodeapi__pb2.IPCFileDeleteRequest.FromString,
                     response_serializer=ipcnodeapi__pb2.IPCFileDeleteResponse.SerializeToString,
+            ),
+            'FileUploadBlockUnary': grpc.unary_unary_rpc_method_handler(
+                    servicer.FileUploadBlockUnary,
+                    request_deserializer=ipcnodeapi__pb2.IPCFileBlockData.FromString,
+                    response_serializer=ipcnodeapi__pb2.IPCFileUploadBlockResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -507,6 +555,33 @@ class IPCNodeAPI(object):
             _registered_method=True)
 
     @staticmethod
+    def FileDownloadRangeCreate(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ipcnodeapi.IPCNodeAPI/FileDownloadRangeCreate',
+            ipcnodeapi__pb2.IPCFileDownloadRangeCreateRequest.SerializeToString,
+            ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def FileDownloadChunkCreate(request,
             target,
             options=(),
@@ -588,6 +663,33 @@ class IPCNodeAPI(object):
             _registered_method=True)
 
     @staticmethod
+    def FileListChunks(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ipcnodeapi.IPCNodeAPI/FileListChunks',
+            ipcnodeapi__pb2.IPCFileListChunksRequest.SerializeToString,
+            ipcnodeapi__pb2.IPCFileListChunksResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def FileDelete(request,
             target,
             options=(),
@@ -604,6 +706,33 @@ class IPCNodeAPI(object):
             '/ipcnodeapi.IPCNodeAPI/FileDelete',
             ipcnodeapi__pb2.IPCFileDeleteRequest.SerializeToString,
             ipcnodeapi__pb2.IPCFileDeleteResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FileUploadBlockUnary(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ipcnodeapi.IPCNodeAPI/FileUploadBlockUnary',
+            ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
+            ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
             options,
             channel_credentials,
             insecure,

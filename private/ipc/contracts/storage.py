@@ -1006,7 +1006,7 @@ class StorageContract:
         """
         return self.contract.functions.MAX_BLOCK_SIZE().call()
 
-    def create_bucket(self, bucket_name: str, from_address: HexAddress, private_key: str, gas_limit: int = None) -> HexStr:
+    def create_bucket(self, bucket_name: str, from_address: HexAddress, private_key: str, gas_limit: int = None, nonce_manager=None) -> HexStr:
         """Creates a new bucket.
         
         Args:
@@ -1014,6 +1014,7 @@ class StorageContract:
             from_address: Address creating the bucket
             private_key: Private key for signing the transaction
             gas_limit: Optional gas limit for the transaction. If not provided, will use default.
+            nonce_manager: Optional nonce manager for coordinated transactions
             
         Returns:
             Transaction hash of the create operation
@@ -1022,7 +1023,7 @@ class StorageContract:
         tx_params = {
             'from': from_address,
             'gasPrice': self.web3.eth.gas_price,
-            'nonce': self.web3.eth.get_transaction_count(from_address)
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
         }
         
         if gas_limit:
@@ -1036,7 +1037,12 @@ class StorageContract:
         signed_tx = Account.sign_transaction(tx, private_key)
         
         # Send raw transaction
-        tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
         
         # Wait for receipt
         receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
@@ -1052,7 +1058,7 @@ class StorageContract:
         
         return tx_hash.hex()
 
-    def create_file(self, from_address: HexAddress, private_key: str, bucket_id: bytes, file_name: str) -> HexStr:
+    def create_file(self, from_address: HexAddress, private_key: str, bucket_id: bytes, file_name: str, nonce_manager=None) -> HexStr:
         """Creates a new file entry in the specified bucket.
         
         Args:
@@ -1060,6 +1066,7 @@ class StorageContract:
             private_key: Private key for signing the transaction
             bucket_id: ID of the bucket to create the file in (bytes32)
             file_name: Name of the file
+            nonce_manager: Optional nonce manager for coordinated transactions
             
         Returns:
             Transaction hash of the create operation
@@ -1069,7 +1076,7 @@ class StorageContract:
             'from': from_address,
             'gas': 500000,  # Gas limit
             'gasPrice': self.web3.eth.gas_price,
-            'nonce': self.web3.eth.get_transaction_count(from_address)
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
         }
         
         tx = self.contract.functions.createFile(bucket_id, file_name).build_transaction(tx_params)
@@ -1078,7 +1085,12 @@ class StorageContract:
         signed_tx = Account.sign_transaction(tx, private_key)
         
         # Send raw transaction
-        tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
         
         # Wait for receipt
         receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
@@ -1094,7 +1106,7 @@ class StorageContract:
         
         return tx_hash.hex()
 
-    def add_file_chunk(self, from_address: HexAddress, private_key: str, cid: bytes, bucket_id: bytes, name: str, encoded_chunk_size: int, cids: list, chunk_blocks_sizes: list, chunk_index: int) -> HexStr:
+    def add_file_chunk(self, from_address: HexAddress, private_key: str, cid: bytes, bucket_id: bytes, name: str, encoded_chunk_size: int, cids: list, chunk_blocks_sizes: list, chunk_index: int, nonce_manager=None) -> HexStr:
         """Adds a chunk to a file.
         
         Args:
@@ -1107,6 +1119,7 @@ class StorageContract:
             cids: List of block CIDs in the chunk
             chunk_blocks_sizes: List of block sizes
             chunk_index: Index of the chunk
+            nonce_manager: Optional nonce manager for coordinated transactions
             
         Returns:
             Transaction hash of the add operation
@@ -1116,7 +1129,7 @@ class StorageContract:
             'from': from_address,
             'gas': 1000000,  # Higher gas limit for chunk operations
             'gasPrice': self.web3.eth.gas_price,
-            'nonce': self.web3.eth.get_transaction_count(from_address)
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
         }
         
         tx = self.contract.functions.addFileChunk(
@@ -1127,7 +1140,12 @@ class StorageContract:
         signed_tx = Account.sign_transaction(tx, private_key)
         
         # Send raw transaction
-        tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
         
         # Wait for receipt
         receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)

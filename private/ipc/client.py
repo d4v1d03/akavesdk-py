@@ -5,10 +5,36 @@ from web3.middleware import ExtraDataToPOAMiddleware
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
 from .contracts import StorageContract, AccessManagerContract
+import threading
 
 class TransactionFailedError(Exception):
     """Raised when a transaction fails (receipt status is 0)."""
     pass
+
+class NonceManager:
+    
+    def __init__(self, web3: Web3, address: str):
+        self.web3 = web3
+        self.address = address
+        self._lock = threading.Lock()
+        self._nonce = None
+        self._last_sync = 0
+        
+    def get_nonce(self) -> int:
+        with self._lock:
+            current_time = time.time()
+            
+            if self._nonce is None or (current_time - self._last_sync) > 30:
+                self._nonce = self.web3.eth.get_transaction_count(self.address)
+                self._last_sync = current_time
+            
+            current_nonce = self._nonce
+            self._nonce += 1
+            return current_nonce
+    
+    def reset_nonce(self):
+        with self._lock:
+            self._nonce = None
 
 class Config:
     """Configuration for the Ethereum storage contract client."""
@@ -29,6 +55,7 @@ class Client:
         self.auth = auth
         self.storage = storage
         self.access_manager = access_manager
+        self.nonce_manager = NonceManager(web3, auth.address)
         # self.ticker = 0.2  # 200ms polling interval (currently unused)
 
     @classmethod

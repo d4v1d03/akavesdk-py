@@ -148,7 +148,8 @@ class IPC:
                 bucket_name=name,
                 from_address=self.ipc.auth.address,
                 private_key=self.ipc.auth.key,
-                gas_limit=500000
+                gas_limit=500000,
+                nonce_manager=self.ipc.nonce_manager
             )
             receipt = self.ipc.web3.eth.wait_for_transaction_receipt(tx)
             
@@ -455,6 +456,26 @@ class IPC:
             except Exception as e:
                 raise SDKError(f"failed to get bucket: {str(e)}")
             
+            try:
+                tx_hash = self.ipc.storage.create_file(
+                    self.ipc.auth.address, 
+                    self.ipc.auth.key,
+                    bucket[0],  # bucket_id
+                    file_name,
+                    nonce_manager=self.ipc.nonce_manager
+                )
+                logging.info(f"File creation transaction sent, tx_hash: {tx_hash}")
+                
+                if hasattr(self.ipc, 'wait_for_tx'):
+                    self.ipc.wait_for_tx(tx_hash)
+                elif hasattr(self.ipc, 'web3') and hasattr(self.ipc.web3.eth, 'wait_for_transaction_receipt'):
+                    receipt = self.ipc.web3.eth.wait_for_transaction_receipt(tx_hash)
+                    if receipt.status != 1:
+                        raise SDKError("CreateFile transaction failed")
+                
+            except Exception as e:
+                raise SDKError(f"failed to create file in storage contract: {str(e)}")
+            
             chunk_enc_overhead = 0
             try:
                 file_enc_key = encryption_key(self.encryption_key, bucket_name, file_name)
@@ -760,7 +781,8 @@ class IPC:
                 chunk_dag.proto_node_size,  # encoded_chunk_size: int (proto node size)
                 cids,                       # cids: list (array of block CIDs as bytes32[])
                 sizes,                      # chunk_blocks_sizes: list (array of block sizes)
-                index                       # chunk_index: int (chunk index)
+                index,                      # chunk_index: int (chunk index)
+                nonce_manager=self.ipc.nonce_manager  # nonce_manager for coordinated transactions
             )
             
             if hasattr(self.ipc, 'wait_for_tx') and hasattr(tx, 'hex'):
@@ -942,24 +964,22 @@ class IPC:
            
             try:
                 import base58
-                actual_node_id = node_id
-                
-                try:
-                    if actual_node_id.startswith('12D3'):
-                        decoded = base58.b58decode(actual_node_id)
-                        node_id_bytes = decoded
-                    else:
-                        node_id_bytes = actual_node_id.encode() if isinstance(actual_node_id, str) else actual_node_id
-                except Exception:
-                    node_id_bytes = actual_node_id.encode() if isinstance(actual_node_id, str) else actual_node_id
+                if node_id.startswith('12D3'):
+                    decoded = base58.b58decode(node_id)
+                    node_id_bytes = decoded
+                else:
+                    node_id_bytes = node_id.encode() if isinstance(node_id, str) else node_id
             except ImportError:
                 node_id_bytes = node_id.encode() if isinstance(node_id, str) else node_id
+            
+            chain_id = 78964  
+            contract_address = "0x9Aa8ff1604280d66577ecB5051a3833a983Ca3aF"  
             
             domain = Domain(
                 name="Storage",
                 version="1",
-                chain_id=int(self.ipc.web3.eth.chain_id) if hasattr(self.ipc, 'web3') and hasattr(self.ipc.web3, 'eth') else 80244,
-                verifying_contract=self.ipc.storage.contract_address if hasattr(self.ipc, 'storage') and hasattr(self.ipc.storage, 'contract_address') else "0x9Aa8ff1604280d66577ecB5051a3833a983Ca3aF"
+                chain_id=chain_id,
+                verifying_contract=contract_address
             )
             
             data_types = {
@@ -973,27 +993,43 @@ class IPC:
                 ]
             }
             
+            from eth_utils import to_int
+            
             data_message = {
                 "chunkCID": bytes(chunk_cid_bytes),     
                 "blockCID": bytes(bcid),                
-                "chunkIndex": chunk_index,             
-                "blockIndex": block_index,           
+                "chunkIndex": to_int(chunk_index),  # Ensure int for uint256
+                "blockIndex": int(block_index) & 0xFF,  # Ensure uint8 range
                 "nodeId": bytes(node_id_bytes),       
-                "nonce": nonce                          
+                "nonce": to_int(nonce)  # Ensure int for uint256
             }
+            
+            # Debug logging 
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Chunk CID: {chunk_cid}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Block CID: {block_cid}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Chunk Index: {chunk_index}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Block Index: {block_index}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Node ID: {node_id}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Nonce: {nonce}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Chain ID: {chain_id}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Contract Address: {contract_address}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Chunk CID bytes: {chunk_cid_bytes.hex()}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Block CID bytes (bcid): {bytes(bcid).hex()}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Node ID bytes: {node_id_bytes.hex()}")
+            
             if isinstance(self.ipc.auth.key, bytes):
                 private_key_bytes = self.ipc.auth.key
             else:
                 key_str = str(self.ipc.auth.key).replace('0x', '')
                 private_key_bytes = bytes.fromhex(key_str)
             
-            logging.debug(f"Private key bytes length: {len(private_key_bytes)}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Private key bytes length: {len(private_key_bytes)}")
             
             signature_bytes = sign(private_key_bytes, domain, data_message, data_types)
             signature_hex = signature_bytes.hex()
             
-            logging.debug(f"[PYTHON_UPLOAD_SIGNATURE] Generated signature: {signature_hex}")
-            logging.debug(f"[PYTHON_UPLOAD_SIGNATURE] Signature length: {len(signature_hex)}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Generated signature: {signature_hex}")
+            print(f"[PYTHON_UPLOAD_SIGNATURE] Signature length: {len(signature_hex)}")
             
             return signature_hex, nonce_bytes
             

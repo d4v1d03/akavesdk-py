@@ -159,6 +159,7 @@ class FileMeta:
 @dataclass
 class IPCBucketCreateResult:
     """Result of IPC bucket creation."""
+    id: str
     name: str
     created_at: TimestampType
 

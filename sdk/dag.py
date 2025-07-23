@@ -1,6 +1,6 @@
 import io
 import hashlib
-from typing import List, Optional, Any, BinaryIO
+from typing import List, Optional, Any, BinaryIO, Tuple
 from dataclasses import dataclass
 
 try:
@@ -33,7 +33,13 @@ except ImportError:
             else:
                 return 0x55  # raw
 
-from private.encryption.encryption import encrypt
+try:
+    from ipld_dag_pb import decode as decode_dag_pb
+    DAG_PB_AVAILABLE = True
+except ImportError:
+    DAG_PB_AVAILABLE = False
+
+from private.encryption.encryption import encrypt, decrypt
 from .model import FileBlockUpload
 
 DEFAULT_CID_VERSION = 1
@@ -398,3 +404,37 @@ def block_by_cid(blocks: List[FileBlockUpload], cid_str: str) -> tuple[FileBlock
         if block.cid == cid_str:
             return block, True
     return FileBlockUpload(cid="", data=b""), False
+
+def node_sizes(node_data: bytes) -> Tuple[int, int]:
+    
+    try:
+        # For our implementation, proto size is the encoded size
+        proto_node_size = len(node_data)
+        raw_data_size = proto_node_size
+        return raw_data_size, proto_node_size
+        
+    except Exception as e:
+        raise DAGError(f"failed to calculate node sizes: {str(e)}")
+
+def extract_block_data(id_str: str, data: bytes) -> bytes:
+    """Extract block data from encoded data based on CID codec type."""
+    try:
+        block_cid = CID.decode(id_str)
+    except Exception as e:
+        raise ValueError(f"Invalid CID: {e}")
+    
+    codec_name = getattr(block_cid.codec, 'name', str(block_cid.codec))
+    
+    if codec_name == "dag-pb":
+        if not DAG_PB_AVAILABLE:
+            raise ValueError("DAG-PB decoding requires ipld_dag_pb library. Install with: pip install ipld_dag_pb")
+        try:
+            decoded_node = decode_dag_pb(data)
+            return decoded_node.data if decoded_node.data else b''
+        except Exception as e:
+            raise ValueError(f"Failed to decode DAG-PB node: {e}")
+    elif codec_name == "raw":
+        return data 
+    else:
+        raise ValueError(f"Unknown CID codec: {codec_name}")
+

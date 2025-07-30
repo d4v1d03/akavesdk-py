@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 from akavesdk import SDK, SDKError
 import private.pb.ipcnodeapi_pb2 as ipcnodeapi_pb2
+from sdk.config import DEFAULT_CONFIG_TEST_SDK_CONN
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent / '.env'
@@ -24,18 +25,11 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Default configuration
-DEFAULT_CONFIG = {
-    'AKAVE_SDK_NODE': 'connect.akave.ai:5000',  # For streaming operations
-    'AKAVE_IPC_NODE': 'connect.akave.ai:5500',  # For IPC operations
-    'ETHEREUM_NODE_URL': 'https://n3-us.akave.ai/ext/bc/2JMWNmZbYvWcJRPPy1siaDBZaDGTDAaqXoY5UBKh4YrhNFzEce/rpc',
-    'STORAGE_CONTRACT_ADDRESS': '0x9Aa8ff1604280d66577ecB5051a3833a983Ca3aF',  # Will be obtained from node
-    'ACCESS_CONTRACT_ADDRESS': '',   # Will be obtained from node
-}
+
 
 def get_env_or_default(key: str) -> str:
     """Get environment variable or default value."""
-    return os.getenv(key, DEFAULT_CONFIG.get(key, ''))
+    return os.getenv(key, DEFAULT_CONFIG_TEST_SDK_CONN.get(key, ''))
 
 def validate_configuration():
     """Validate required configuration."""

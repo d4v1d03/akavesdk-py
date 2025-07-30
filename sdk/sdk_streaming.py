@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
-from .common import SDKError
+from .config import SDKError, BlockSize, EncryptionOverhead
 from .model import (
     FileMeta, FileListItem, Chunk, FileUpload, FileDownload, FileBlockUpload, 
     FileChunkUpload, AkaveBlockData, FilecoinBlockData, FileBlockDownload, FileChunkDownload,
@@ -30,9 +30,7 @@ from multiformats import cid as cidlib
 
 logger = logging.getLogger(__name__)
 
-# Constants
-BlockSize = 1 << 20  # 1MiB blocks
-EncryptionOverhead = 16  # 16 bytes overhead from encryption
+
 
 class ConnectionPool:
     def __init__(self):

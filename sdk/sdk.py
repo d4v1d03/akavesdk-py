@@ -1,20 +1,15 @@
 import grpc
-from google.protobuf.timestamp_pb2 import Timestamp
 import logging
 from private.pb import nodeapi_pb2, nodeapi_pb2_grpc, ipcnodeapi_pb2, ipcnodeapi_pb2_grpc
 from private.ipc.client import Client
 from private.spclient.spclient import SPClient
-from private.encryption import derive_key
-from typing import List, Optional
-from multiformats.cid import CID
+from typing import Optional
 from .sdk_ipc import IPC
 from .sdk_streaming import StreamingAPI
 from .erasure_code import ErasureCode
 from .config import Config, SDKConfig, SDKError, BLOCK_SIZE, MIN_BUCKET_NAME_LENGTH
-import os
+from .bucket_client import BucketClient
 import time
-
-
 
 class AkaveContractFetcher:
     """Fetches contract addresses from Akave node"""
@@ -68,7 +63,6 @@ class AkaveContractFetcher:
 
 class SDK:
     def __init__(self, config: SDKConfig):
-        self.client = None
         self.conn = None
         self.ipc_conn = None
         self.ipc_client = None
@@ -83,7 +77,9 @@ class SDK:
         self.streaming_max_blocks_in_chunk = config.streaming_max_blocks_in_chunk
         self.parity_blocks_count = config.parity_blocks_count
         self.ipc_address = config.ipc_address or config.address  # Use provided IPC address or fallback to main address
+        self.connection_timeout = config.connection_timeout
         
+
         self._contract_info = None
 
         if self.block_part_size <= 0 or self.block_part_size > BLOCK_SIZE:
@@ -91,7 +87,7 @@ class SDK:
 
         # Create gRPC channel and clients for SDK operations
         self.conn = grpc.insecure_channel(config.address)
-        self.client = nodeapi_pb2_grpc.NodeAPIStub(self.conn)
+        self.bucket_client = BucketClient(self.conn, self.connection_timeout)
         
         # Create separate gRPC channel for IPC operations if needed
         if self.ipc_address == config.address:
@@ -221,53 +217,11 @@ class SDK:
         except Exception as e:
             raise SDKError(f"Failed to initialize IPC API: {str(e)}")
 
-    def create_bucket(self, ctx, name: str):
-        if len(name) < MIN_BUCKET_NAME_LENGTH:
-            raise SDKError("Invalid bucket name")
-
-        request = nodeapi_pb2.BucketCreateRequest(name=name)
-        response = self.client.BucketCreate(request)
-        return BucketCreateResult(name=response.name, created_at=response.created_at.AsTime() if hasattr(response.created_at, 'AsTime') else response.created_at)
-
-    def view_bucket(self, ctx, name: str):
-        if name == "":
-            raise SDKError("Invalid bucket name")
-
-        request = nodeapi_pb2.BucketViewRequest(bucket_name=name)
-        response = self.client.BucketView(request)
-        return Bucket(
-            name=response.name, 
-            created_at=response.created_at.AsTime() if hasattr(response.created_at, 'AsTime') else response.created_at
-        )
-
-    def delete_bucket(self, ctx, name: str):
-        if name == "":
-            raise SDKError("Invalid bucket name")
-           
-        try:
-            request = nodeapi_pb2.BucketDeleteRequest(name=name)
-            self.client.BucketDelete(request)
-            return True
-        except Exception as err:
-            logging.error(f"Error deleting bucket: {err}")
-            raise SDKError(f"Failed to delete bucket: {err}")
-
-
-
-class BucketCreateResult:
-    def __init__(self, name: str, created_at: Timestamp):
-        self.name = name
-        self.created_at = created_at
-
-class Bucket:
-    def __init__(self, name: str, created_at: Timestamp):
-        self.name = name
-        self.created_at = created_at
-
-def encryption_key_derivation(parent_key: bytes, *info_data: str):
-    if len(parent_key) == 0:
-        return None
-
-    info = "/".join(info_data)
-    key = derive_key(parent_key, info.encode())
-    return key
+    def create_bucket(self, name: str):
+        return self.bucket_client.bucket_create(name)
+    
+    def view_bucket(self, name: str):
+        return self.bucket_client.bucket_view(name)
+    
+    def delete_bucket(self, name: str):
+        return self.bucket_client.bucket_delete(name)

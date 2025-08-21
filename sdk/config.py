@@ -1,5 +1,7 @@
 from typing import Optional, List
 from private.memory.memory import Size
+from dataclasses import dataclass
+from .erasure_code import ErasureCode
 
 BLOCK_SIZE = 1 * Size.MB
 ENCRYPTION_OVERHEAD = 28  # 16 bytes for AES-GCM tag, 12 bytes for nonce
@@ -85,3 +87,20 @@ KNOWN_ERROR_STRINGS: List[str] = [
     "AccessManager: caller is not authorized",
     # Add all other known error strings here...
 ]
+
+@dataclass
+class SDKConfig:
+    address: str
+    max_concurrency: int
+    block_part_size: int
+    use_connection_pool: bool
+    parity_blocks_count: int = 0
+    chunk_buffer: int = 10
+    encryption_key: Optional[bytes] = None
+    private_key: Optional[str] = None
+    streaming_max_blocks_in_chunk: int = 32
+    connection_timeout: Optional[int] = 30
+    max_retries: Optional[int] = 3
+    backoff_delay: Optional[int] = 1
+    ipc_address: Optional[str] = None
+    erasure_code: Optional[ErasureCode] = None

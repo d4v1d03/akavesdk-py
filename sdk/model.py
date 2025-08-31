@@ -1,11 +1,3 @@
-# Copyright (C) 2024 Akave
-# See LICENSE for copying information.
-
-"""
-Module containing data model classes for the Akave SDK.
-These classes are the Python equivalent of Go structs from model.go.
-"""
-
 import time
 from typing import List, Optional, Union, Any, NewType
 from dataclasses import dataclass
@@ -13,8 +5,6 @@ from datetime import datetime
 
 from multiformats.cid import CID as CIDType
 
-
-# Type for timestamp fields that could be different formats
 TimestampType = Union[datetime, float, int]
 
 @dataclass

@@ -1,102 +1,75 @@
-import web3
-from typing import Dict, Optional
-from sdk.config import KNOWN_ERROR_STRINGS, validate_hex_string
+
+from typing import Optional, Any, Dict
+from web3.exceptions import ContractLogicError
 
 
-# Dictionary to store the mapping from error hash (selector) to error string
-_error_hash_to_error_map: Dict[str, str] = {}
-
-def parse_errors_to_hashes() -> None:
-    """
-    Computes the Keccak256 hash for known error strings and populates the 
-    _error_hash_to_error_map. This should be called once on initialization.
+def error_hash_to_error(error_data: Any) -> Exception:
+    if hasattr(error_data, 'args') and error_data.args:
+        error_str = str(error_data.args[0]) if error_data.args else str(error_data)
+    else:
+        error_str = str(error_data)
+    hash_code = None
+    if isinstance(error_str, str):
+        import re
+        hex_match = re.search(r'0x[a-fA-F0-9]{8}', error_str)
+        if hex_match:
+            hash_code = hex_match.group(0).lower()
     
-    The hash calculation mimics Solidity's `keccak256(bytes("Error(string)"))`, 
-    taking the first 4 bytes as the selector.
-    """
-    global _error_hash_to_error_map
-    if _error_hash_to_error_map: # Avoid re-parsing if already done
-        return
+    error_map = {
+        "0x497ef2c2": "BucketAlreadyExists",
+        "0x4f4b202a": "BucketInvalid", 
+        "0xdc64d0ad": "BucketInvalidOwner",
+        "0x938a92b7": "BucketNonexists",
+        "0x89fddc00": "BucketNonempty",
+        "0x6891dde0": "FileAlreadyExists",
+        "0x77a3cbd8": "FileInvalid",
+        "0x21584586": "FileNonexists",
+        "0xc4a3b6f1": "FileNonempty",
+        "0xd09ec7af": "FileNameDuplicate",
+        "0xd96b03b1": "FileFullyUploaded",
+        "0x702cf740": "FileChunkDuplicate",
+        "0xc1edd16a": "BlockAlreadyExists",
+        "0xcb20e88c": "BlockInvalid",
+        "0x15123121": "BlockNonexists",
+        "0x856b300d": "InvalidArrayLength",
+        "0x17ec8370": "InvalidFileBlocksCount",
+        "0x5660ebd2": "InvalidLastBlockSize",
+        "0x1b6fdfeb": "InvalidEncodedSize",
+        "0xfe33db92": "InvalidFileCID",
+        "0x37c7f255": "IndexMismatch",
+        "0xcefa6b05": "NoPolicy",
+        "0x5c371e92": "FileNotFilled",
+        "0xdad01942": "BlockAlreadyFilled",
+        "0x4b6b8ec8": "ChunkCIDMismatch",
+        "0x0d6b18f0": "NotBucketOwner",
+        "0xc4c1a0c5": "BucketNotFound",
+        "0x3bcbb0de": "FileDoesNotExist",
+        "0xa2c09fea": "NotThePolicyOwner",
+        "0x94289054": "CloneArgumentsTooLong",
+        "0x4ca249dc": "Create2EmptyBytecode",
+        "0xf3714a9b": "ECDSAInvalidSignatureS",
+        "0x367e2e27": "ECDSAInvalidSignatureLength",
+        "0xf645eedf": "ECDSAInvalidSignature",
+        "0xb73e95e1": "AlreadyWhitelisted",
+        "0xe6c4247b": "InvalidAddress",
+        "0x584a7938": "NotWhitelisted",
+        "0x227bc153": "MathOverflowedMulDiv",
+        "0xe7b199a6": "InvalidBlocksAmount",
+        "0x59b452ef": "InvalidBlockIndex",
+        "0x55cbc831": "LastChunkDuplicate",
+        "0x2abde339": "FileNotExists",
+        "0x48e0ed68": "NotSignedByBucketOwner",
+        "0x923b8cbb": "NonceAlreadyUsed",
+        "0x9605a010": "OffsetOutOfBounds",
+    }
+    
+    if hash_code and hash_code in error_map:
+        return Exception(error_map[hash_code]) 
+    return error_data if isinstance(error_data, Exception) else Exception(str(error_data))
 
-    temp_map = {}
-    for error_string in KNOWN_ERROR_STRINGS:
-        # Construct the error signature string
-        error_signature = f"Error({error_string})"
-        # Compute Keccak256 hash
-        hash_bytes = web3.Web3.keccak(text=error_signature)
-        # Take the first 4 bytes as the selector (hex representation)
-        selector = hash_bytes[:4].hex()
-        # Store the mapping (e.g., '0xabcdef12' -> "Storage: bucket exists")
-        temp_map[selector] = error_string
-        
-    _error_hash_to_error_map = temp_map
-    print(f"Parsed {len(_error_hash_to_error_map)} error strings into hashes.") # Optional: logging
 
-def error_hash_to_error(error_data: str) -> Optional[str]:
-    """
-    Attempts to map an error hash (typically from a transaction revert reason)
-    to a known human-readable error string.
-
-    Args:
-        error_data: The error data string, usually starting with '0x' followed 
-                    by the 4-byte error selector (e.g., "0x08c379a0...").
-
-    Returns:
-        The corresponding human-readable error string if found, otherwise None.
-    """
-    if not _error_hash_to_error_map:
-        # Ensure hashes are parsed if accessed before explicit call
-        print("Warning: Error hashes not parsed yet. Parsing now.") # Optional: logging
-        parse_errors_to_hashes()
-        
-    if not isinstance(error_data, str) or not validate_hex_string(error_data):
-        return None 
-
-    # Extract the selector (first 4 bytes after '0x')
-    selector = error_data[:10] # Takes '0x' + 8 hex characters
-
-    return _error_hash_to_error_map.get(selector)
-
-# Automatically parse errors when the module is imported
-parse_errors_to_hashes()
-
-# --- How to use with web3.py ---
-# 
-# from web3.exceptions import ContractLogicError
-# from .errors import error_hash_to_error
-# 
-# try:
-#     # ... make a contract call that might revert ...
-#     tx_hash = contract.functions.someFunction().transact({'from': ..., ...})
-#     receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
-#     if receipt.status == 0:
-#         # Try to get revert reason (requires node support)
-#         try:
-#              tx = web3.eth.get_transaction(tx_hash)
-#              revert_reason = web3.eth.call(tx, tx.blockNumber) # Re-call failed tx
-#              # web3.py might raise ContractLogicError here with the reason
-#         except ContractLogicError as cle:
-#              print(f"ContractLogicError: {cle}")
-#              # The error data might be in cle.args or similar, requires inspection
-#              # Example: cle.args[0] might contain 'execution reverted: 0x...'
-#              error_data = str(cle) # Or parse from args
-#              human_readable_error = error_hash_to_error(error_data) 
-#              if human_readable_error:
-#                  print(f"Known revert reason: {human_readable_error}")
-#              else:
-#                  print(f"Unknown revert reason or data: {error_data}")
-#         except Exception as call_exc:
-#              print(f"Could not get revert reason: {call_exc}")
-#         print("Transaction failed, but couldn't determine exact reason.")
-#         
-# except ContractLogicError as e:
-#     print(f"ContractLogicError on send/call: {e}")
-#     # Process error_hash_to_error(str(e)) or e.args as above
-#     human_readable_error = error_hash_to_error(str(e))
-#     if human_readable_error:
-#         print(f"Known revert reason: {human_readable_error}")
-#     else:
-#         print(f"Unknown revert reason: {e}")
-# except Exception as e:
-#     print(f"An unexpected error occurred: {e}")
-#
+def ignore_offset_error(error: Exception) -> Optional[Exception]:
+    mapped_error = error_hash_to_error(error)
+    if mapped_error and str(mapped_error) == "OffsetOutOfBounds":
+        return None
+    return error

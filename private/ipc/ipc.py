@@ -6,30 +6,36 @@ from typing import Dict, List, Any
 
 from eth_utils import keccak, to_bytes, to_checksum_address
 
-from ..eip712 import Domain as EIP712Domain, TypedData as EIP712TypedData, sign as eip712_sign
+try:
+    from ..eip712 import Domain as EIP712Domain, TypedData as EIP712TypedData, sign as eip712_sign
+except ImportError:
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from eip712 import Domain as EIP712Domain, TypedData as EIP712TypedData, sign as eip712_sign
 
 
 @dataclass
 class StorageData:
-    chunkCID: bytes
-    blockCID: bytes
-    chunkIndex: int
-    blockIndex: int
-    nodeId: bytes
+    chunk_cid: bytes
+    block_cid: bytes  
+    chunk_index: int
+    block_index: int  
+    node_id: bytes   
     nonce: int
     deadline: int
-    bucketId: bytes
+    bucket_id: bytes  
 
     def to_message_dict(self) -> Dict[str, Any]:
         return {
-            "chunkCID": self.chunkCID,
-            "blockCID": self.blockCID,
-            "chunkIndex": self.chunkIndex,
-            "blockIndex": self.blockIndex,
-            "nodeId": self.nodeId,
+            "chunkCID": self.chunk_cid,
+            "blockCID": self.block_cid,
+            "chunkIndex": self.chunk_index,
+            "blockIndex": self.block_index,
+            "nodeId": self.node_id,
             "nonce": self.nonce,
             "deadline": self.deadline,
-            "bucketId": self.bucketId,
+            "bucketId": self.bucket_id,
         }
 
 
@@ -39,18 +45,25 @@ def generate_nonce() -> int:
 
 def calculate_file_id(bucket_id: bytes, name: str) -> bytes:
     if not isinstance(bucket_id, (bytes, bytearray)):
-        raise TypeError("bucket_id must be bytes32")
-    return keccak(bucket_id + name.encode())
+        raise TypeError("bucket_id must be bytes")
+    
+    data = bucket_id + name.encode('utf-8')
+    return keccak(data)
 
 
-def calculate_bucket_id(bucket_name: str, owner_address: str) -> bytes:
-    addr = owner_address.lower()
+def calculate_bucket_id(bucket_name: str, address: str) -> bytes:
+    data = bucket_name.encode('utf-8')
+    
+    addr = address.lower()
     if addr.startswith("0x"):
         addr = addr[2:]
     if len(addr) != 40:
-        raise ValueError("owner_address must be a 20-byte hex string")
+        raise ValueError("address must be a 20-byte hex string")
+    
     address_bytes = bytes.fromhex(addr)
-    return keccak(bucket_name.encode() + address_bytes)
+    data += address_bytes
+    
+    return keccak(data)
 
 
 def sign_block(private_key_hex: str, storage_address: str, chain_id: int, data: StorageData) -> bytes:
@@ -84,5 +97,3 @@ def sign_block(private_key_hex: str, storage_address: str, chain_id: int, data: 
     message = data.to_message_dict()
 
     return eip712_sign(private_key_bytes, domain, message, storage_data_types)
-
-

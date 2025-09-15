@@ -73,3 +73,7 @@ def ignore_offset_error(error: Exception) -> Optional[Exception]:
     if mapped_error and str(mapped_error) == "OffsetOutOfBounds":
         return None
     return error
+
+
+def parse_errors_to_hashes() -> None:
+    pass

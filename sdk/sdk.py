@@ -1,23 +1,26 @@
 import grpc
 import logging
+import io
+import time
+import random
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional, Callable, TypeVar, List, Dict, Any
 from private.pb import nodeapi_pb2, nodeapi_pb2_grpc, ipcnodeapi_pb2, ipcnodeapi_pb2_grpc
 from private.ipc.client import Client
 from private.spclient.spclient import SPClient
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional, Callable, TypeVar
 from .sdk_ipc import IPC
 from .sdk_streaming import StreamingAPI
 from .erasure_code import ErasureCode
 from .config import Config, SDKConfig, SDKError, BLOCK_SIZE, MIN_BUCKET_NAME_LENGTH
 from private.encryption import derive_key
 from .shared.grpc_base import GrpcClientBase
-import time
 
+ENCRYPTION_OVERHEAD = 28  # 16 bytes for AES-GCM tag, 12 bytes for nonce
+MIN_FILE_SIZE = 127  # 127 bytes
 
 class AkaveContractFetcher:
-    """Fetches contract addresses from Akave node"""
-    
     def __init__(self, node_address: str):
         self.node_address = node_address
         self.channel = None
@@ -39,7 +42,6 @@ class AkaveContractFetcher:
             return False
     
     def fetch_contract_addresses(self) -> Optional[dict]:
-        """Fetch contract addresses from the node"""
         if not self.stub:
             return None
         
@@ -79,6 +81,94 @@ class Bucket:
     name: str
     created_at: datetime
 
+@dataclass
+class MonkitStats:
+    name: str
+    successes: int
+    errors: Dict[str, int]
+    highwater: int
+    success_times: Optional[List[float]] = None
+    failure_times: Optional[List[float]] = None
+
+@dataclass
+class WithRetry:
+    max_attempts: int = 5
+    base_delay: float = 0.1  # 100ms in seconds
+
+    def do(self, ctx, func: Callable[[], tuple[bool, Optional[Exception]]]) -> Optional[Exception]:
+        needs_retry, err = func()
+        if err is None:
+            return None
+        if not needs_retry or self.max_attempts == 0:
+            return err
+
+        def sleep_duration(attempt: int, base: float) -> float:
+            backoff = base * (2 ** attempt)
+            jitter = random.uniform(0, base)
+            return backoff + jitter
+
+        for attempt in range(self.max_attempts):
+            delay = sleep_duration(attempt, self.base_delay)
+            
+            logging.debug(f"retrying attempt {attempt}, delay {delay}s, err: {err}")
+            
+            time.sleep(delay)
+            
+            needs_retry, err = func()
+            if err is None:
+                return None
+            if not needs_retry:
+                return err
+        
+        return Exception(f"max retries exceeded: {err}")
+
+class SDKOption:
+    def apply(self, sdk: 'SDK'):
+        pass
+
+class WithMetadataEncryption(SDKOption):
+    def apply(self, sdk: 'SDK'):
+        sdk.use_metadata_encryption = True
+
+class WithEncryptionKey(SDKOption):
+    def __init__(self, key: bytes):
+        self.key = key
+    
+    def apply(self, sdk: 'SDK'):
+        sdk.encryption_key = self.key
+
+class WithPrivateKey(SDKOption):
+    def __init__(self, key: str):
+        self.key = key
+    
+    def apply(self, sdk: 'SDK'):
+        sdk.private_key = self.key
+
+class WithStreamingMaxBlocksInChunk(SDKOption):
+    def __init__(self, max_blocks_in_chunk: int):
+        self.max_blocks_in_chunk = max_blocks_in_chunk
+    
+    def apply(self, sdk: 'SDK'):
+        sdk.streaming_max_blocks_in_chunk = self.max_blocks_in_chunk
+
+class WithErasureCoding(SDKOption):
+    def __init__(self, parity_blocks: int):
+        self.parity_blocks = parity_blocks
+    
+    def apply(self, sdk: 'SDK'):
+        sdk.parity_blocks_count = self.parity_blocks
+
+class WithChunkBuffer(SDKOption):
+    def __init__(self, buffer_size: int):
+        self.buffer_size = buffer_size
+    
+    def apply(self, sdk: 'SDK'):
+        sdk.chunk_buffer = self.buffer_size
+
+class WithoutRetry(SDKOption):
+    def apply(self, sdk: 'SDK'):
+        sdk.with_retry = WithRetry(max_attempts=0)
+
 class SDK():
     def __init__(self, config: SDKConfig):
         self.conn = None
@@ -96,16 +186,12 @@ class SDK():
         if self.config.block_part_size <= 0 or self.config.block_part_size > BLOCK_SIZE:
             raise SDKError(f"Invalid blockPartSize: {config.block_part_size}. Valid range is 1-{BLOCK_SIZE}")
 
-        # Create gRPC channel and clients for SDK operations
         self.conn = grpc.insecure_channel(config.address)
         self.client = nodeapi_pb2_grpc.NodeAPIStub(self.conn)
        
-        # Create separate gRPC channel for IPC operations if needed
         if self.ipc_address == config.address:
-            # Reuse main connection for IPC
             self.ipc_conn = self.conn
         else:
-            # Create separate connection for IPC
             self.ipc_conn = grpc.insecure_channel(self.ipc_address)
         
         self.ipc_client = ipcnodeapi_pb2_grpc.IPCNodeAPIStub(self.ipc_conn)
@@ -261,12 +347,75 @@ class SDK():
         request = nodeapi_pb2.BucketDeleteRequest(name=name)
         self._do_grpc_call("BucketDelete", self.client.BucketDelete, request)
         return True
+
+
+def get_monkit_stats() -> List[MonkitStats]:
+    stats = []
+    return stats
+
+def extract_block_data(id_str: str, data: bytes) -> bytes:
+    try:
+        from multiformats import CID
+        cid = CID.decode(id_str)
+    except Exception as e:
+        raise ValueError(f"failed to decode CID: {e}")
     
+    codec_name = getattr(cid.codec, 'name', str(cid.codec))
+    
+    if codec_name == "dag-pb":
+        try:
+            from .dag import extract_block_data as dag_extract
+            return dag_extract(id_str, data)
+        except Exception as e:
+            raise ValueError(f"failed to decode DAG-PB node: {e}")
+    elif codec_name == "raw":
+        return data
+    else:
+        raise ValueError(f"unknown cid type: {codec_name}")
+
 def encryption_key_derivation(parent_key: bytes, *info_data: str) -> bytes:
     if not parent_key:
-        raise SDKError("Parent key is required for key derivation")
+        return b""
+    
     info = "/".join(info_data)
-    return derive_key(parent_key, info.encode())
+    try:
+        key = derive_key(parent_key, info.encode())
+        return key
+    except Exception as e:
+        raise SDKError(f"failed to derive key: {e}")
+
+def is_retryable_tx_error(err: Exception) -> bool:
+    if err is None:
+        return False
+    
+    msg = str(err).lower()
+    retryable_errors = [
+        "nonce too low",
+        "replacement transaction underpriced", 
+        "eof"
+    ]
+    
+    return any(error in msg for error in retryable_errors)
+
+def skip_to_position(reader: io.IOBase, position: int) -> None:
+    if position > 0:
+        if hasattr(reader, 'seek'):
+            try:
+                reader.seek(position, io.SEEK_SET)
+                return
+            except (OSError, io.UnsupportedOperation):
+                pass
+        
+        if hasattr(reader, 'read'):
+            remaining = position
+            while remaining > 0:
+                chunk_size = min(remaining, 8192)  # Read in 8KB chunks
+                chunk = reader.read(chunk_size)
+                if not chunk:  # EOF reached
+                    break
+                remaining -= len(chunk)
+        else:
+            raise SDKError("reader does not support seek or read operations")
 
 def parse_timestamp(ts) -> Optional[datetime]:
     if ts is None:

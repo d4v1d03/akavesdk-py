@@ -1,191 +1,332 @@
 import time
-from typing import Optional
+import threading
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Any, Union, NamedTuple
 from web3 import Web3
-from web3.middleware import ExtraDataToPOAMiddleware
-try:
-    from web3.middleware import geth_poa_middleware
-except ImportError:
-    # For newer web3 versions, geth_poa_middleware is in a different location
-    try:
-        from web3.middleware.geth_poa import geth_poa_middleware
-    except ImportError:
-        def geth_poa_middleware(make_request, web3):
-            def middleware(method, params):
-                response = make_request(method, params)
-                return response
-            return middleware
+from web3.middleware.geth_poa import geth_poa_middleware
+from web3.exceptions import TransactionNotFound
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
 from .contracts import StorageContract, AccessManagerContract
-import threading
-from sdk.config import Config
+from .ipc import StorageData, sign_block
+
+@dataclass
+class Config:
+    dial_uri: str = ""
+    private_key: str = ""
+    storage_contract_address: str = ""
+    access_contract_address: str = ""
+    policy_factory_contract_address: str = ""
+
+    @staticmethod
+    def default_config() -> 'Config':
+        return Config()
+
+
+@dataclass 
+class ContractsAddresses:
+    storage: str = ""
+    access_manager: str = ""
+    policy_factory: str = ""
+
+
+class BatchReceiptRequest(NamedTuple):
+    hash: str
+    key: str
+
+
+class BatchReceiptResponse(NamedTuple):
+    receipt: Optional[dict]
+    error: Optional[Exception]
+    key: str
+
+
+@dataclass
+class BatchReceiptResult:
+    responses: List[BatchReceiptResponse]
+
 
 class TransactionFailedError(Exception):
     pass
 
-class NonceManager:
-    def __init__(self, web3: Web3, address: str):
-        self.web3 = web3
-        self.address = address
-        self._lock = threading.Lock()
-        self._nonce = None
-        self._last_sync = 0
-        
-    def get_nonce(self) -> int:
-        with self._lock:
-            current_time = time.time()
-            
-            if self._nonce is None or (current_time - self._last_sync) > 30:
-                self._nonce = self.web3.eth.get_transaction_count(self.address)
-                self._last_sync = current_time
-            
-            current_nonce = self._nonce
-            self._nonce += 1
-            return current_nonce
-    
-    def reset_nonce(self):
-        with self._lock:
-            self._nonce = None
 
-class Config:
-    def __init__(self, dial_uri: str, private_key: str, storage_contract_address: str, access_contract_address: Optional[str] = None):
-        self.dial_uri = dial_uri
-        self.private_key = private_key
-        self.storage_contract_address = storage_contract_address
-        self.access_contract_address = access_contract_address
-
-    @staticmethod
-    def default():
-        return Config(dial_uri="", private_key="", storage_contract_address="", access_contract_address="")
-
-class Client:
-    def __init__(self, web3: Web3, auth: LocalAccount, storage: StorageContract, access_manager: Optional[AccessManagerContract] = None):
-        self.web3 = web3
-        self.auth = auth
+class Client:    
+    def __init__(self, web3: Web3, auth: LocalAccount, storage: StorageContract, 
+                 access_manager: Optional[AccessManagerContract] = None,
+                 policy_factory: Optional[object] = None, 
+                 list_policy_abi: Optional[dict] = None,
+                 policy_factory_abi: Optional[dict] = None,
+                 addresses: Optional[ContractsAddresses] = None,
+                 chain_id: Optional[int] = None):
         self.storage = storage
         self.access_manager = access_manager
-        self.nonce_manager = NonceManager(web3, auth.address)
-        # self.ticker = 0.2  # 200ms polling interval (currently unused)
+        self.policy_factory = policy_factory
+        self.list_policy_abi = list_policy_abi
+        self.policy_factory_abi = policy_factory_abi
+        self.auth = auth
+        self.eth = web3
+        self.addresses = addresses or ContractsAddresses()
+        self._chain_id = chain_id
 
     @classmethod
     def dial(cls, config: Config) -> 'Client':
-    
-        web3 = Web3(Web3.HTTPProvider(config.dial_uri))
-        if not web3.is_connected():
-            raise ConnectionError(f"Failed to connect to Ethereum node at {config.dial_uri}")
+        try:
+            client = Web3(Web3.HTTPProvider(config.dial_uri))
+            if not client.is_connected():
+                raise ConnectionError(f"Failed to connect to {config.dial_uri}")
+        except Exception as e:
+            raise ConnectionError(f"Failed to connect to {config.dial_uri}: {e}")
 
-        web3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0) 
+        client.middleware_onion.inject(geth_poa_middleware, layer=0)
 
         try:
-            account = Account.from_key(config.private_key)
-        except ValueError as e:
-            raise ValueError(f"Invalid private key: {e}") from e
+            private_key = config.private_key
+            if private_key.startswith('0x'):
+                private_key = private_key[2:]
+            account = Account.from_key(private_key)
+        except Exception as e:
+            raise ValueError(f"Failed to load private key: {e}")
 
-        storage = StorageContract(web3, config.storage_contract_address)
+        try:
+            chain_id = client.eth.chain_id
+        except Exception as e:
+            raise ConnectionError(f"Failed to get chain ID: {e}")
+
+        storage = StorageContract(client, config.storage_contract_address)
+        
         access_manager = None
         if config.access_contract_address:
-            access_manager = AccessManagerContract(web3, config.access_contract_address)
+            access_manager = AccessManagerContract(client, config.access_contract_address)
 
-        return cls(web3, account, storage, access_manager)
+        policy_factory = None
+        list_policy_abi = None
+        policy_factory_abi = None
+        if config.policy_factory_contract_address:
+            try:
+                from .contracts import PolicyFactoryContract, ListPolicyMetaData, PolicyFactoryMetaData
+                policy_factory = PolicyFactoryContract(client, config.policy_factory_contract_address)
+                list_policy_abi = ListPolicyMetaData.ABI
+                policy_factory_abi = PolicyFactoryMetaData.ABI
+            except ImportError:
+                pass  
+        
+        addresses = ContractsAddresses(
+            storage=config.storage_contract_address,
+            access_manager=config.access_contract_address,
+            policy_factory=config.policy_factory_contract_address
+        )
 
-    @staticmethod
-    def _wait_for_tx_receipt(web3_instance: Web3, tx_hash: str, timeout: int = 120, poll_latency: float = 0.5):
-        try:
-            receipt = web3_instance.eth.wait_for_transaction_receipt(
-                tx_hash, timeout=timeout, poll_latency=poll_latency
-            )
-            if receipt.status == 0:
-                raise TransactionFailedError(f"Transaction {tx_hash} failed.")
-            return receipt
-        except Exception as e:
-             raise TimeoutError(f"Timeout waiting for transaction {tx_hash}") from e
+        ipc_client = cls(
+            web3=client,
+            auth=account,
+            storage=storage, 
+            access_manager=access_manager,
+            policy_factory=policy_factory,
+            list_policy_abi=list_policy_abi,
+            policy_factory_abi=policy_factory_abi,
+            addresses=addresses,
+            chain_id=chain_id
+        )
+
+        return ipc_client
 
     @classmethod
-    def deploy_storage(cls, config: Config):
-        web3 = Web3(Web3.HTTPProvider(config.dial_uri))
-        if not web3.is_connected():
-            raise ConnectionError(f"Failed to connect to Ethereum node at {config.dial_uri}")
+    def deploy_contracts(cls, config: Config) -> 'Client':
+        eth_client = Web3(Web3.HTTPProvider(config.dial_uri))
+        if not eth_client.is_connected():
+            raise ConnectionError(f"Failed to connect to {config.dial_uri}")
+
+        # Setup account
+        private_key = config.private_key
+        if private_key.startswith('0x'):
+            private_key = private_key[2:]
+        account = Account.from_key(private_key)
         
-        # Add POA middleware
-        web3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+        chain_id = eth_client.eth.chain_id
+        
+        client = cls(
+            web3=eth_client,
+            auth=account,
+            storage=None,  
+            chain_id=chain_id
+        )
+        
+        try:
+            from .contracts import (
+                deploy_erc1967_proxy, deploy_access_manager, deploy_list_policy, 
+                deploy_policy_factory, StorageContract, AccessManagerContract, 
+                PolicyFactoryContract, ListPolicyMetaData, PolicyFactoryMetaData
+            )
+            
+            try:
+                from .contracts import deploy_akave_token, deploy_storage
+            except ImportError:
+                raise NotImplementedError(
+                    "AkaveToken and Storage deployment functions are not yet implemented. "
+                    "The following functions are missing: deploy_akave_token, deploy_storage"
+                )
+            
+            akave_token_addr, tx_hash, token_contract = deploy_akave_token(eth_client, account)
+            client.wait_for_tx(tx_hash)
+            
+            storage_impl_addr, tx_hash, _ = deploy_storage(eth_client, account)
+            client.wait_for_tx(tx_hash)
+            
+            storage_abi = StorageContract.get_abi()
+            init_data = StorageContract.encode_function_data("initialize", [akave_token_addr])
+            
+            storage_proxy_addr, tx_hash, _ = deploy_erc1967_proxy(
+                eth_client, account, storage_impl_addr, init_data
+            )
+            client.wait_for_tx(tx_hash)
+            
+            storage = StorageContract(eth_client, storage_proxy_addr)
+            client.storage = storage
+            client.addresses.storage = storage_proxy_addr
+            
+            minter_role = token_contract.functions.MINTER_ROLE().call()
+            tx_hash = token_contract.functions.grantRole(minter_role, storage_proxy_addr).transact({
+                'from': account.address
+            })
+            client.wait_for_tx(tx_hash)
+            
+            access_addr, tx_hash, access_manager = deploy_access_manager(eth_client, account, storage_proxy_addr)
+            client.wait_for_tx(tx_hash)
+            
+            client.access_manager = access_manager
+            client.addresses.access_manager = access_addr
+            
+            tx_hash = storage.set_access_manager(account, access_addr)
+            client.wait_for_tx(tx_hash)
+            
+            base_list_policy_addr, tx_hash, _ = deploy_list_policy(eth_client, account)
+            client.wait_for_tx(tx_hash)
+            
+            policy_factory_addr, tx_hash, policy_factory = deploy_policy_factory(
+                eth_client, account, base_list_policy_addr
+            )
+            client.wait_for_tx(tx_hash)
+            
+            client.policy_factory = policy_factory
+            client.addresses.policy_factory = policy_factory_addr
+            
+            client.list_policy_abi = ListPolicyMetaData.ABI
+            client.policy_factory_abi = PolicyFactoryMetaData.ABI
+            
+            return client
+            
+        except ImportError as e:
+            raise NotImplementedError(
+                f"Contract deployment functions not available: {e}. "
+                "This feature requires complete contract bindings."
+            )
+
+    def chain_id(self) -> int:
+        return self._chain_id
+
+    def deploy_list_policy(self, user_address: str) -> str:
+        if not self.policy_factory or not self.list_policy_abi:
+            raise ValueError("PolicyFactory or ListPolicy ABI not available")
+        
+        list_policy_contract = self.eth.eth.contract(abi=self.list_policy_abi)
+        abi_bytes = list_policy_contract.encodeABI(fn_name='initialize', args=[user_address])
+        
+        tx_hash = self.policy_factory.deploy_policy(self.auth, bytes.fromhex(abi_bytes[2:]))
+        receipt = self.wait_for_tx(tx_hash)
+        
+        if not self.policy_factory_abi:
+            raise ValueError("PolicyFactory ABI not available")
+            
+        policy_deployed_event = None
+        for item in self.policy_factory_abi:
+            if item.get('type') == 'event' and item.get('name') == 'PolicyDeployed':
+                policy_deployed_event = item
+                break
+        
+        if not policy_deployed_event:
+            raise ValueError("PolicyDeployed event not found in ABI")
+        
+        event_hash = self.eth.keccak(text=f"PolicyDeployed({','.join([input['type'] for input in policy_deployed_event['inputs']])})")
+        
+        policy_instance_address = None
+        for log in receipt.logs:
+            if len(log.topics) >= 3 and log.topics[0] == event_hash:
+                policy_instance_address = Web3.to_checksum_address('0x' + log.topics[2].hex()[-40:])
+                break
+        
+        if not policy_instance_address:
+            raise RuntimeError("Failed to extract policy instance address from deployment transaction")
+        
+        from .contracts import ListPolicyContract
+        return ListPolicyContract(self.eth, policy_instance_address)
+
+    def get_transaction_receipts_batch(self, requests: List[BatchReceiptRequest], 
+                                     timeout: float = 30.0) -> BatchReceiptResult:
+        try:
+            batch_requests = []
+            for req in requests:
+                batch_requests.append(('eth_getTransactionReceipt', [req.hash]))
+            
+            raw_responses = self.eth.manager.request_blocking_batch(batch_requests)
+            
+            responses = []
+            for i, (req, raw_response) in enumerate(zip(requests, raw_responses)):
+                response = BatchReceiptResponse(
+                    receipt=raw_response.get('result') if raw_response.get('result') else None,
+                    error=Exception(raw_response.get('error', {}).get('message', 'Unknown error')) if 'error' in raw_response else None,
+                    key=req.key
+                )
+                responses.append(response)
+            
+            return BatchReceiptResult(responses=responses)
+            
+        except Exception as e:
+            responses = []
+            for req in requests:
+                try:
+                    receipt = self.eth.eth.get_transaction_receipt(req.hash)
+                    response = BatchReceiptResponse(receipt=dict(receipt), error=None, key=req.key)
+                except TransactionNotFound:
+                    response = BatchReceiptResponse(receipt=None, error=None, key=req.key)
+                except Exception as err:
+                    response = BatchReceiptResponse(receipt=None, error=err, key=req.key)
+                responses.append(response)
+            
+            return BatchReceiptResult(responses=responses)
+
+    def wait_for_tx(self, tx_hash: Union[str, bytes], timeout: float = 120.0) -> dict:
+        if isinstance(tx_hash, bytes):
+            tx_hash = tx_hash.hex()
+        if not tx_hash.startswith('0x'):
+            tx_hash = '0x' + tx_hash
 
         try:
-            account = Account.from_key(config.private_key)
-        except ValueError as e:
-            raise ValueError(f"Invalid private key: {e}") from e
-            
-        try:
-            from .contracts import storage_abi, storage_bytecode, access_manager_abi, access_manager_bytecode
-        except ImportError:
-            raise ImportError("Storage/AccessManager ABI and Bytecode not found. Ensure they are defined in akavesdk-py/private/ipc/contracts.")
-            
-        gas_price = web3.eth.gas_price # Consider using maxFeePerGas/maxPriorityFeePerGas for EIP-1559
-
-        Storage = web3.eth.contract(abi=storage_abi, bytecode=storage_bytecode)
-        print(f"Deploying Storage contract from {account.address}...")
-        construct_txn = Storage.constructor().build_transaction({
-            'from': account.address,
-            'gas': 5000000, 
-            'gasPrice': gas_price, 
-            'nonce': web3.eth.get_transaction_count(account.address)
-        })
-        signed_tx = account.sign_transaction(construct_txn)
-        tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
-        print(f"Storage deployment transaction sent: {tx_hash.hex()}")
-        storage_receipt = cls._wait_for_tx_receipt(web3, tx_hash)
-        storage_address = storage_receipt.contractAddress
-        print(f"Storage contract deployed at: {storage_address}")
-
-        AccessManager = web3.eth.contract(abi=access_manager_abi, bytecode=access_manager_bytecode)
-        print(f"Deploying AccessManager contract...")
-        construct_txn = AccessManager.constructor(storage_address).build_transaction({
-            'from': account.address,
-            'gas': 5000000,
-            'gasPrice': gas_price, 
-            'nonce': web3.eth.get_transaction_count(account.address) 
-        })
-        signed_tx = account.sign_transaction(construct_txn)
-        tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
-        print(f"AccessManager deployment transaction sent: {tx_hash.hex()}")
-        access_manager_receipt = cls._wait_for_tx_receipt(web3, tx_hash)
-        access_manager_address = access_manager_receipt.contractAddress
-        print(f"AccessManager contract deployed at: {access_manager_address}")
-
-        storage_instance = StorageContract(web3, storage_address)
-        access_manager_instance = AccessManagerContract(web3, access_manager_address)
-
+            receipt = self.eth.eth.get_transaction_receipt(tx_hash)
+            if receipt.status == 1:
+                return receipt
+            else:
+                raise TransactionFailedError("Transaction failed")
+        except TransactionNotFound:
+            pass  
+        except Exception as e:
+            raise TransactionFailedError(f"Error checking transaction receipt: {e}")
         
-        deployed_client = cls(web3, account, storage_instance, access_manager_instance)
-        return deployed_client, storage_address, access_manager_address
-
-    def wait_for_tx(self, tx_hash: str, timeout: int = 120, poll_latency: float = 0.5) -> None:
-        Client._wait_for_tx_receipt(self.web3, tx_hash, timeout, poll_latency)
-
-# Example usage (illustrative):
-# if __name__ == '__main__':
-#     # Assumes you have a running node (e.g., Ganache) and contract ABI/Bytecode
-#     cfg = Config.default()
-#     cfg.dial_uri = "http://127.0.0.1:8545" 
-#     # Replace with a valid private key with funds on the network
-#     cfg.private_key = "0x..." # DO NOT COMMIT REAL PRIVATE KEYS
-
-#     try:
-#         print("Deploying contracts...")
-#         # Deployment requires ABI/Bytecode in contracts module
-#         # deployed_client, storage_addr, access_addr = Client.deploy_storage(cfg)
-#         # print(f"Deployed Storage: {storage_addr}, AccessManager: {access_addr}")
-
-#         # Example: Using an existing contract
-#         cfg.storage_contract_address = "0x..." # Address of deployed Storage
-#         cfg.access_contract_address = "0x..." # Address of deployed AccessManager
-#         client = Client.dial(cfg)
-#         print("Client dialed.")
+        start_time = time.time()
+        poll_interval = 0.2  
         
-#         # Example contract interaction (assuming StorageContract has create_bucket)
-#         # tx_hash = client.storage.create_bucket("my-test-bucket", client.auth.address, cfg.private_key)
-#         # print(f"Create bucket tx sent: {tx_hash}")
-#         # client.wait_for_tx(tx_hash) 
-#         # print("Bucket created successfully.")
-
-#     except (ConnectionError, ValueError, TransactionFailedError, TimeoutError, ImportError) as e:
-#         print(f"Error: {e}")
+        while True:
+            current_time = time.time()
+            if current_time - start_time > timeout:
+                raise TimeoutError(f"Timeout waiting for transaction {tx_hash}")
+            
+            try:
+                receipt = self.eth.eth.get_transaction_receipt(tx_hash)
+                if receipt.status == 1:
+                    return receipt
+                else:
+                    raise TransactionFailedError("Transaction failed")
+            except TransactionNotFound:
+                time.sleep(poll_interval)
+                continue
+            except Exception as e:
+                raise TransactionFailedError(f"Error checking transaction receipt: {e}")

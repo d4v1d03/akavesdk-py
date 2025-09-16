@@ -220,3 +220,11 @@ class AccessManagerContract:
             Address of the storage contract
         """
         return self.contract.functions.storageContract().call()
+
+
+def new_access_manager(web3: Web3, contract_address: str) -> AccessManagerContract:
+    return AccessManagerContract(web3, contract_address)
+
+
+def deploy_access_manager(web3: Web3, account, storage_address: str) -> Tuple[str, str]:
+    raise NotImplementedError("AccessManager deployment not yet implemented")

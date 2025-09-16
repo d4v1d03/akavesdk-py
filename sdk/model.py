@@ -222,3 +222,67 @@ class IPCFileChunkUploadV2:
     blocks: List[FileBlockUpload]
     bucket_id: bytes  # 32-byte array in Go, using bytes in Python
     file_name: str
+
+
+@dataclass
+class TxWaitSignal:
+    file_upload_chunk: IPCFileChunkUploadV2
+    transaction: Any  
+
+
+class UploadState:    
+    def __init__(self, dag_root):
+        from threading import RLock
+        self.dag_root = dag_root
+        self.mutex = RLock()
+        self.pre_created_chunks = {}  # map[int]chunkWithTx
+        self.is_committed = False
+        self.chunk_count = 0
+        self.actual_file_size = 0
+        self.encoded_file_size = 0
+    
+    def pre_create_chunk(self, chunk: IPCFileChunkUploadV2, tx) -> None:
+        with self.mutex:
+            self.pre_created_chunks[chunk.index] = {
+                'chunk': chunk,
+                'tx': tx
+            }
+            self.chunk_count += 1
+            self.actual_file_size += chunk.actual_size
+            self.encoded_file_size += chunk.encoded_size
+            if hasattr(self.dag_root, 'add_link'):
+                self.dag_root.add_link(chunk.chunk_cid, chunk.raw_data_size, chunk.encoded_size)
+    
+    def chunk_uploaded(self, chunk: IPCFileChunkUploadV2) -> None:
+        with self.mutex:
+            if chunk.index in self.pre_created_chunks:
+                del self.pre_created_chunks[chunk.index]
+    
+    def list_pre_created_chunks(self) -> List[dict]:
+        with self.mutex:
+            return list(self.pre_created_chunks.values())
+
+
+@dataclass
+class IPCFileUpload:
+    bucket_name: str
+    name: str
+    state: UploadState
+    blocks_counter: int = 0
+    bytes_counter: int = 0
+    chunks_counter: int = 0
+
+
+def new_ipc_file_upload(bucket_name: str, name: str) -> IPCFileUpload:
+    from .dag import DAGRoot
+    dag_root = DAGRoot.new()
+    state = UploadState(dag_root)
+    
+    return IPCFileUpload(
+        bucket_name=bucket_name,
+        name=name,
+        state=state,
+        blocks_counter=0,
+        bytes_counter=0,
+        chunks_counter=0
+    )

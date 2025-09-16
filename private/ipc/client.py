@@ -3,7 +3,7 @@ import threading
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any, Union, NamedTuple
 from web3 import Web3
-from web3.middleware.geth_poa import geth_poa_middleware
+from web3.middleware.proof_of_authority import ExtraDataToPOAMiddleware
 from web3.exceptions import TransactionNotFound
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
@@ -77,7 +77,7 @@ class Client:
         except Exception as e:
             raise ConnectionError(f"Failed to connect to {config.dial_uri}: {e}")
 
-        client.middleware_onion.inject(geth_poa_middleware, layer=0)
+        client.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 
         try:
             private_key = config.private_key

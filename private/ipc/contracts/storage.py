@@ -29,15 +29,20 @@ class StorageContract:
         # Contract ABI from the Go bindings
         self.abi = [
             {
+                "inputs": [],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
                 "inputs": [
                     {
                         "internalType": "address",
-                        "name": "tokenAddress",
+                        "name": "target",
                         "type": "address"
                     }
                 ],
-                "stateMutability": "nonpayable",
-                "type": "constructor"
+                "name": "AddressEmptyCode",
+                "type": "error"
             },
             {
                 "inputs": [],
@@ -745,21 +750,58 @@ class StorageContract:
                 "inputs": [
                     {
                         "internalType": "string",
-                        "name": "name",
+                        "name": "bucketName",
                         "type": "string"
                     },
                     {
                         "internalType": "address",
                         "name": "owner",
                         "type": "address"
-                    }
-                ],
-                "name": "getBucketIndexByName",
-                "outputs": [
+                    },
                     {
                         "internalType": "uint256",
-                        "name": "index",
+                        "name": "fileOffset",
                         "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "fileLimit",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "getBucketByName",
+                "outputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "bytes32",
+                                "name": "id",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "name",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "createdAt",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "address",
+                                "name": "owner",
+                                "type": "address"
+                            },
+                            {
+                                "internalType": "bytes32[]",
+                                "name": "files",
+                                "type": "bytes32[]"
+                            }
+                        ],
+                        "internalType": "struct IStorage.Bucket",
+                        "name": "bucket",
+                        "type": "tuple"
                     }
                 ],
                 "stateMutability": "view",
@@ -977,10 +1019,1066 @@ class StorageContract:
                 ],
                 "stateMutability": "view",
                 "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "UPGRADE_INTERFACE_VERSION",
+                "outputs": [
+                    {
+                        "internalType": "string",
+                        "name": "",
+                        "type": "string"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes[]",
+                        "name": "cids",
+                        "type": "bytes[]"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "bucketId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "fileName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "uint256[]",
+                        "name": "encodedChunkSizes",
+                        "type": "uint256[]"
+                    },
+                    {
+                        "internalType": "bytes32[][]",
+                        "name": "chunkBlocksCIDs",
+                        "type": "bytes32[][]"
+                    },
+                    {
+                        "internalType": "uint256[][]",
+                        "name": "chunkBlockSizes",
+                        "type": "uint256[][]"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "startingChunkIndex",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "addFileChunks",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    }
+                ],
+                "name": "getFileById",
+                "outputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "bytes32",
+                                "name": "id",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "bytes",
+                                "name": "fileCID",
+                                "type": "bytes"
+                            },
+                            {
+                                "internalType": "bytes32",
+                                "name": "bucketId",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "name",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "encodedSize",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "createdAt",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "actualSize",
+                                "type": "uint256"
+                            },
+                            {
+                                "components": [
+                                    {
+                                        "internalType": "bytes[]",
+                                        "name": "chunkCIDs",
+                                        "type": "bytes[]"
+                                    },
+                                    {
+                                        "internalType": "uint256[]",
+                                        "name": "chunkSize",
+                                        "type": "uint256[]"
+                                    }
+                                ],
+                                "internalType": "struct IStorage.Chunk",
+                                "name": "chunks",
+                                "type": "tuple"
+                            }
+                        ],
+                        "internalType": "struct IStorage.File",
+                        "name": "file",
+                        "type": "tuple"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "string",
+                        "name": "bucketName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    }
+                ],
+                "name": "getBucketIndexByName",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "index",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "exists",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "fileId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "chunkIndex",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "isChunkFilled",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "fileId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint8",
+                        "name": "blockIndex",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "chunkIndex",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "isBlockFilled",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "version",
+                "outputs": [
+                    {
+                        "internalType": "string",
+                        "name": "",
+                        "type": "string"
+                    }
+                ],
+                "stateMutability": "pure",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getChainID",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    }
+                ],
+                "name": "getFileOwner",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32[]",
+                        "name": "ids",
+                        "type": "bytes32[]"
+                    }
+                ],
+                "name": "getBucketsByIds",
+                "outputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "bytes32",
+                                "name": "id",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "name",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "createdAt",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "address",
+                                "name": "owner",
+                                "type": "address"
+                            },
+                            {
+                                "internalType": "bytes32[]",
+                                "name": "files",
+                                "type": "bytes32[]"
+                            }
+                        ],
+                        "internalType": "struct IStorage.Bucket[]",
+                        "name": "",
+                        "type": "tuple[]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "offset",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "limit",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "fileOffset",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "fileLimit",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "getOwnerBuckets",
+                "outputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "bytes32",
+                                "name": "id",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "name",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "createdAt",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "address",
+                                "name": "owner",
+                                "type": "address"
+                            },
+                            {
+                                "internalType": "bytes32[]",
+                                "name": "files",
+                                "type": "bytes32[]"
+                            }
+                        ],
+                        "internalType": "struct IStorage.Bucket[]",
+                        "name": "buckets",
+                        "type": "tuple[]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "tokenAddress",
+                        "type": "address"
+                    }
+                ],
+                "name": "initialize",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "timestamp",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "token",
+                "outputs": [
+                    {
+                        "internalType": "contractIAkaveToken",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "peerId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "cid",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "fileName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "isReplica",
+                        "type": "bool"
+                    }
+                ],
+                "name": "addPeerBlock",
+                "outputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "peerId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "cid",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "fileName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "index",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "deletePeerBlock",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "bytes32",
+                                "name": "blockCID",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "bytes32",
+                                "name": "nodeId",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "bytes32",
+                                "name": "bucketId",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "chunkIndex",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "nonce",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint8",
+                                "name": "blockIndex",
+                                "type": "uint8"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "fileName",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "bytes",
+                                "name": "signature",
+                                "type": "bytes"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "deadline",
+                                "type": "uint256"
+                            }
+                        ],
+                        "internalType": "struct IStorage.FillChunkBlockArgs",
+                        "name": "args",
+                        "type": "tuple"
+                    }
+                ],
+                "name": "fillChunkBlock",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "bytes32",
+                                "name": "blockCID",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "bytes32",
+                                "name": "nodeId",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "bytes32",
+                                "name": "bucketId",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "chunkIndex",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "nonce",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint8",
+                                "name": "blockIndex",
+                                "type": "uint8"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "fileName",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "bytes",
+                                "name": "signature",
+                                "type": "bytes"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "deadline",
+                                "type": "uint256"
+                            }
+                        ],
+                        "internalType": "struct IStorage.FillChunkBlockArgs[]",
+                        "name": "args",
+                        "type": "tuple[]"
+                    }
+                ],
+                "name": "fillChunkBlocks",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "id",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "index",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "getChunkByIndex",
+                "outputs": [
+                    {
+                        "internalType": "bytes",
+                        "name": "",
+                        "type": "bytes"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "string",
+                        "name": "bucketName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "fileName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "bucketId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    }
+                ],
+                "name": "getFullFileInfo",
+                "outputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "bytes32",
+                                "name": "id",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "bytes",
+                                "name": "fileCID",
+                                "type": "bytes"
+                            },
+                            {
+                                "internalType": "bytes32",
+                                "name": "bucketId",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "name",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "encodedSize",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "createdAt",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "actualSize",
+                                "type": "uint256"
+                            },
+                            {
+                                "components": [
+                                    {
+                                        "internalType": "bytes[]",
+                                        "name": "chunkCIDs",
+                                        "type": "bytes[]"
+                                    },
+                                    {
+                                        "internalType": "uint256[]",
+                                        "name": "chunkSize",
+                                        "type": "uint256[]"
+                                    }
+                                ],
+                                "internalType": "struct IStorage.Chunk",
+                                "name": "chunks",
+                                "type": "tuple"
+                            }
+                        ],
+                        "internalType": "struct IStorage.File",
+                        "name": "file",
+                        "type": "tuple"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "index",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "exists",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32[]",
+                        "name": "ids",
+                        "type": "bytes32[]"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "bucketOffset",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "bucketLimit",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "fileOffset",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "fileLimit",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "getBucketsByIdsWithFiles",
+                "outputs": [
+                    {
+                        "components": [
+                            {
+                                "internalType": "bytes32",
+                                "name": "id",
+                                "type": "bytes32"
+                            },
+                            {
+                                "internalType": "string",
+                                "name": "name",
+                                "type": "string"
+                            },
+                            {
+                                "internalType": "uint256",
+                                "name": "createdAt",
+                                "type": "uint256"
+                            },
+                            {
+                                "internalType": "address",
+                                "name": "owner",
+                                "type": "address"
+                            },
+                            {
+                                "internalType": "bytes32[]",
+                                "name": "files",
+                                "type": "bytes32[]"
+                            }
+                        ],
+                        "internalType": "struct IStorage.Bucket[]",
+                        "name": "buckets",
+                        "type": "tuple[]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "peerId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "cid",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "fileName",
+                        "type": "string"
+                    }
+                ],
+                "name": "getPeerBlockIndexById",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "index",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "exists",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32[]",
+                        "name": "cids",
+                        "type": "bytes32[]"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "fileName",
+                        "type": "string"
+                    }
+                ],
+                "name": "getPeersArrayByPeerBlockCid",
+                "outputs": [
+                    {
+                        "internalType": "bytes32[][]",
+                        "name": "peers",
+                        "type": "bytes32[][]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "cid",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "fileName",
+                        "type": "string"
+                    }
+                ],
+                "name": "getPeersByPeerBlockCid",
+                "outputs": [
+                    {
+                        "internalType": "bytes32[]",
+                        "name": "peers",
+                        "type": "bytes32[]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "cid",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "peerId",
+                        "type": "bytes32"
+                    }
+                ],
+                "name": "isPeerBlockReplica",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "",
+                        "type": "bytes32"
+                    }
+                ],
+                "name": "fileFillCounter",
+                "outputs": [
+                    {
+                        "internalType": "uint16",
+                        "name": "",
+                        "type": "uint16"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "",
+                        "type": "bytes32"
+                    }
+                ],
+                "name": "fileRewardClaimed",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "fulfilledBlocks",
+                "outputs": [
+                    {
+                        "internalType": "uint32",
+                        "name": "",
+                        "type": "uint32"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "eip712Domain",
+                "outputs": [
+                    {
+                        "internalType": "bytes1",
+                        "name": "fields",
+                        "type": "bytes1"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "name",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "version",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "chainId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "verifyingContract",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "salt",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256[]",
+                        "name": "extensions",
+                        "type": "uint256[]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "proxiableUUID",
+                "outputs": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "",
+                        "type": "bytes32"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "accessManagerAddress",
+                        "type": "address"
+                    }
+                ],
+                "name": "setAccessManager",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "newImplementation",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "bytes",
+                        "name": "data",
+                        "type": "bytes"
+                    }
+                ],
+                "name": "upgradeToAndCall",
+                "outputs": [],
+                "stateMutability": "payable",
+                "type": "function"
             }
         ]
         
-        self.contract = web3.eth.contract(address=contract_address, abi=self.abi)
+        try:
+            self.contract = web3.eth.contract(address=contract_address, abi=self.abi)
+        except Exception as e:
+            # Hide the ABI details from error messages
+            error_msg = str(e)
+            if "Could not format invalid value" in error_msg and "as field 'abi'" in error_msg:
+                raise ValueError(f"Failed to initialize storage contract at {contract_address}: Invalid ABI format")
+            else:
+                raise ValueError(f"Failed to initialize storage contract at {contract_address}: {type(e).__name__}")from e
 
     def get_access_manager(self) -> HexAddress:
         """Gets the address of the associated access manager contract.
@@ -1318,22 +2416,31 @@ class StorageContract:
             
         return tx_hash.hex()
 
-    def get_bucket(self, bucket_name: str) -> Tuple[str, int, HexAddress]:
-        bucket = self.contract.functions.getBucketByName(bucket_name).call()
+    def get_bucket(self, bucket_name: str, owner_address: str = None) -> Tuple[str, int, HexAddress]:
+        if owner_address is None:
+            raise ValueError("Owner address must be provided for bucket lookup")
+        bucket = self.contract.functions.getBucketByName(bucket_name, owner_address, 0, 10).call()
         return (bucket[1], bucket[2], bucket[3])  # (name, createdAt, owner)
 
-    def get_file(self, bucket_name: str, file_name: str) -> Tuple[str, bytes, int, int]:
-        
-        bucket = self.contract.functions.getBucketByName(bucket_name).call()
+    def get_file(self, bucket_name: str, file_name: str, owner_address: str = None) -> Tuple[str, bytes, int, int]:
+        if owner_address is None:
+            raise ValueError("Owner address must be provided for bucket lookup")
+            
+        bucket = self.contract.functions.getBucketByName(bucket_name, owner_address, 0, 10).call()
         bucket_id = bucket[0]  # bytes32 id
         file_info = self.contract.functions.getFileByName(bucket_id, file_name).call()
         return (file_info[3], file_info[0], file_info[4], file_info[5])  # (name, id, encodedSize, createdAt)
 
-    def get_bucket_by_name(self, call_opts: dict, bucket_name: str):
+    def get_bucket_by_name(self, call_opts: dict, bucket_name: str, owner_address: str = None, file_offset: int = 0, file_limit: int = 10):
+        if owner_address is None and call_opts and 'from' in call_opts:
+            owner_address = call_opts['from']
+        elif owner_address is None:
+            raise ValueError("Owner address must be provided either as parameter or in call_opts['from']")
+            
         if call_opts:
-            return self.contract.functions.getBucketByName(bucket_name).call(call_opts)
+            return self.contract.functions.getBucketByName(bucket_name, owner_address, file_offset, file_limit).call(call_opts)
         else:
-            return self.contract.functions.getBucketByName(bucket_name).call()
+            return self.contract.functions.getBucketByName(bucket_name, owner_address, file_offset, file_limit).call()
 
     def get_file_by_name(self, call_opts: dict, bucket_id: bytes, file_name: str):
         if call_opts:
@@ -1368,3 +2475,309 @@ class StorageContract:
             True if file is filled, False otherwise
         """
         return self.contract.functions.isFileFilledV2(file_id).call()
+
+    def get_upgrade_interface_version(self) -> str:
+        
+        return self.contract.functions.UPGRADE_INTERFACE_VERSION().call()
+
+    def add_file_chunks(self, from_address: HexAddress, private_key: str, cids: List[bytes], bucket_id: bytes, 
+                       file_name: str, encoded_chunk_sizes: List[int], chunk_blocks_cids: List[List[bytes]], 
+                       chunk_block_sizes: List[List[int]], starting_chunk_index: int, nonce_manager=None) -> HexStr:
+        
+        tx_params = {
+            'from': from_address,
+            'gas': 2000000,  # Higher gas limit for multiple chunks
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
+        }
+        
+        tx = self.contract.functions.addFileChunks(
+            cids, bucket_id, file_name, encoded_chunk_sizes, chunk_blocks_cids, chunk_block_sizes, starting_chunk_index
+        ).build_transaction(tx_params)
+        
+        signed_tx = Account.sign_transaction(tx, private_key)
+        
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
+        
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()
+
+    def get_file_by_id(self, file_id: bytes):       
+        return self.contract.functions.getFileById(file_id).call()
+
+    def get_bucket_index_by_name(self, bucket_name: str, owner_address: HexAddress) -> Tuple[int, bool]:
+        return self.contract.functions.getBucketIndexByName(bucket_name, owner_address).call()
+
+    def is_chunk_filled(self, file_id: bytes, chunk_index: int) -> bool:
+        return self.contract.functions.isChunkFilled(file_id, chunk_index).call()
+
+    def is_block_filled(self, file_id: bytes, block_index: int, chunk_index: int) -> bool:
+        return self.contract.functions.isBlockFilled(file_id, block_index, chunk_index).call()
+
+    def get_version(self) -> str:
+        return self.contract.functions.version().call()
+
+    def get_chain_id(self) -> int:
+        return self.contract.functions.getChainID().call()
+
+    def get_file_owner(self, file_id: bytes) -> HexAddress:
+        return self.contract.functions.getFileOwner(file_id).call()
+
+    def get_buckets_by_ids(self, bucket_ids: List[bytes]):
+        return self.contract.functions.getBucketsByIds(bucket_ids).call()
+
+    def get_owner_buckets(self, owner_address: HexAddress, offset: int = 0, limit: int = 10, 
+                         file_offset: int = 0, file_limit: int = 10):
+        return self.contract.functions.getOwnerBuckets(owner_address, offset, limit, file_offset, file_limit).call()
+
+    def initialize_contract(self, from_address: HexAddress, private_key: str, token_address: HexAddress, nonce_manager=None) -> HexStr:
+        tx_params = {
+            'from': from_address,
+            'gas': 500000,
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
+        }
+        
+        tx = self.contract.functions.initialize(token_address).build_transaction(tx_params)
+        signed_tx = Account.sign_transaction(tx, private_key)
+        
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
+        
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()
+
+    def get_timestamp(self) -> int:
+        return self.contract.functions.timestamp().call()
+
+    def get_token(self) -> HexAddress:
+        return self.contract.functions.token().call()
+
+    def add_peer_block(self, from_address: HexAddress, private_key: str, peer_id: bytes, cid: bytes, 
+                      file_name: str, is_replica: bool, nonce_manager=None) -> HexStr:
+        tx_params = {
+            'from': from_address,
+            'gas': 500000,
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
+        }
+        
+        tx = self.contract.functions.addPeerBlock(peer_id, cid, file_name, is_replica).build_transaction(tx_params)
+        signed_tx = Account.sign_transaction(tx, private_key)
+        
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
+        
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()
+
+    def delete_peer_block(self, from_address: HexAddress, private_key: str, block_id: bytes, 
+                         peer_id: bytes, cid: bytes, file_name: str, index: int, nonce_manager=None) -> HexStr:
+        tx_params = {
+            'from': from_address,
+            'gas': 500000,
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
+        }
+        
+        tx = self.contract.functions.deletePeerBlock(block_id, peer_id, cid, file_name, index).build_transaction(tx_params)
+        signed_tx = Account.sign_transaction(tx, private_key)
+        
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
+        
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()
+
+    def fill_chunk_block(self, from_address: HexAddress, private_key: str, fill_args: dict, nonce_manager=None) -> HexStr:
+        tx_params = {
+            'from': from_address,
+            'gas': 1000000,
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
+        }
+        
+        args_tuple = (
+            fill_args['blockCID'],
+            fill_args['nodeId'], 
+            fill_args['bucketId'],
+            fill_args['chunkIndex'],
+            fill_args['nonce'],
+            fill_args['blockIndex'],
+            fill_args['fileName'],
+            fill_args['signature'],
+            fill_args['deadline']
+        )
+        
+        tx = self.contract.functions.fillChunkBlock(args_tuple).build_transaction(tx_params)
+        signed_tx = Account.sign_transaction(tx, private_key)
+        
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
+        
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()
+
+    def fill_chunk_blocks(self, from_address: HexAddress, private_key: str, fill_args_list: List[dict], nonce_manager=None) -> HexStr:
+        tx_params = {
+            'from': from_address,
+            'gas': 2000000,  
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
+        }
+        
+        args_tuples = []
+        for fill_args in fill_args_list:
+            args_tuple = (
+                fill_args['blockCID'],
+                fill_args['nodeId'],
+                fill_args['bucketId'], 
+                fill_args['chunkIndex'],
+                fill_args['nonce'],
+                fill_args['blockIndex'],
+                fill_args['fileName'],
+                fill_args['signature'],
+                fill_args['deadline']
+            )
+            args_tuples.append(args_tuple)
+        
+        tx = self.contract.functions.fillChunkBlocks(args_tuples).build_transaction(tx_params)
+        signed_tx = Account.sign_transaction(tx, private_key)
+        
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
+        
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()
+
+    def get_chunk_by_index(self, file_id: bytes, index: int) -> Tuple[bytes, int]:
+        return self.contract.functions.getChunkByIndex(file_id, index).call()
+
+    def get_full_file_info(self, bucket_name: str, file_name: str, bucket_id: bytes, owner_address: HexAddress):
+        return self.contract.functions.getFullFileInfo(bucket_name, file_name, bucket_id, owner_address).call()
+
+    def get_buckets_by_ids_with_files(self, bucket_ids: List[bytes], bucket_offset: int = 0, 
+                                     bucket_limit: int = 10, file_offset: int = 0, file_limit: int = 10):
+        return self.contract.functions.getBucketsByIdsWithFiles(
+            bucket_ids, bucket_offset, bucket_limit, file_offset, file_limit
+        ).call()
+
+    def get_peer_block_index_by_id(self, peer_id: bytes, cid: bytes, file_name: str) -> Tuple[int, bool]:
+        return self.contract.functions.getPeerBlockIndexById(peer_id, cid, file_name).call()
+
+    def get_peers_array_by_peer_block_cid(self, cids: List[bytes], file_name: str) -> List[List[bytes]]:
+        return self.contract.functions.getPeersArrayByPeerBlockCid(cids, file_name).call()
+
+    def get_peers_by_peer_block_cid(self, cid: bytes, file_name: str) -> List[bytes]:
+        return self.contract.functions.getPeersByPeerBlockCid(cid, file_name).call()
+
+    def is_peer_block_replica(self, cid: bytes, peer_id: bytes) -> bool:
+        return self.contract.functions.isPeerBlockReplica(cid, peer_id).call()
+
+    def get_file_fill_counter(self, file_id: bytes) -> int:
+        return self.contract.functions.fileFillCounter(file_id).call()
+
+    def get_file_reward_claimed(self, file_id: bytes) -> bool:
+        return self.contract.functions.fileRewardClaimed(file_id).call()
+
+    def get_fulfilled_blocks(self, file_id: bytes, index: int) -> int:
+        return self.contract.functions.fulfilledBlocks(file_id, index).call()
+
+    def get_eip712_domain(self):
+        return self.contract.functions.eip712Domain().call()
+
+    def get_proxiable_uuid(self) -> bytes:
+        return self.contract.functions.proxiableUUID().call()
+
+    def set_access_manager(self, from_address: HexAddress, private_key: str, access_manager_address: HexAddress, 
+                          nonce_manager=None) -> HexStr:
+        tx_params = {
+            'from': from_address,
+            'gas': 500000,
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
+        }
+        
+        tx = self.contract.functions.setAccessManager(access_manager_address).build_transaction(tx_params)
+        signed_tx = Account.sign_transaction(tx, private_key)
+        
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
+        
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()
+
+    def upgrade_to_and_call(self, from_address: HexAddress, private_key: str, new_implementation: HexAddress, 
+                           data: bytes, nonce_manager=None) -> HexStr:
+        tx_params = {
+            'from': from_address,
+            'gas': 1000000,
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': nonce_manager.get_nonce() if nonce_manager else self.web3.eth.get_transaction_count(from_address)
+        }
+        
+        tx = self.contract.functions.upgradeToAndCall(new_implementation, data).build_transaction(tx_params)
+        signed_tx = Account.sign_transaction(tx, private_key)
+        
+        try:
+            tx_hash = self.web3.eth.send_raw_transaction(get_raw_transaction(signed_tx))
+        except Exception as e:
+            if nonce_manager and "nonce too low" in str(e):
+                nonce_manager.reset_nonce()
+            raise
+        
+        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status != 1:
+            raise Exception(f"Transaction failed. Receipt: {receipt}")
+        
+        return tx_hash.hex()

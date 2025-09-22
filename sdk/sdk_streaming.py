@@ -14,6 +14,7 @@ import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from .config import SDKError, SDKConfig, BlockSize, EncryptionOverhead
+from .connection import ConnectionPool
 from .model import (
     FileMeta, FileListItem, Chunk, FileUpload, FileDownload, FileBlockUpload, 
     FileChunkUpload, AkaveBlockData, FilecoinBlockData, FileBlockDownload, FileChunkDownload,
@@ -32,34 +33,6 @@ logger = logging.getLogger(__name__)
 
 
 
-class ConnectionPool:
-    def __init__(self):
-        self.connections = {}
-        self.lock = threading.Lock()
-    
-    def create_streaming_client(self, address: str, use_pool: bool) -> Tuple[nodeapi_pb2_grpc.StreamAPIStub, Optional[Callable[[], None]]]:
-        if not use_pool:
-            channel = grpc.insecure_channel(address)
-            client = nodeapi_pb2_grpc.StreamAPIStub(channel)
-            return client, channel.close()
-        
-        with self.lock:
-            if address in self.connections:
-                client, _ = self.connections[address]
-                return client, None
-            
-            channel = grpc.insecure_channel(address)
-            client = nodeapi_pb2_grpc.StreamAPIStub(channel)
-            self.connections[address] = (client, channel)
-            return client, None
-    
-    def close(self) -> None:
-        """Close all connections in the pool."""
-        with self.lock:
-            for _, channel in self.connections.values():
-                channel.close()
-            self.connections = {}
-        return None
 
 class DAGRoot:
     def __init__(self) -> None:
@@ -79,17 +52,6 @@ class DAGRoot:
         return None
     
     def build(self) -> Any:
-        # if not hasattr(cidlib, 'make_cid'):
-        #     # Fallback if cidlib not available
-        #     cid_str = "Qm" + base64.b32encode(os.urandom(32)).decode('utf-8')
-        #     return type('CID', (), {'string': lambda *args: cid_str})()
-        
-        # try:
-        #     # Actually build a CID if the library is available
-        #     root_cid = cidlib.make_cid(f"dag_root_{len(self.links)}")
-        #     return type('CID', (), {'string': lambda *args: str(root_cid)})()
-        # except Exception:
-        #     # Fallback on error
         cid_str = "Qm" + base64.b32encode(os.urandom(32)).decode('utf-8')
         return type('CID', (), {'string': lambda *args: cid_str})()
 
@@ -419,7 +381,10 @@ class StreamingAPI:
     
     def _add_dag_link(self, dag_root: DAGRoot, chunk_cid: Any, raw_size: int, proto_node_size: int) -> None:
         """Add a link to the DAG root"""
-        return dag_root.add_link(chunk_cid, raw_size, proto_node_size)
+        try:
+            dag_root.add_link(chunk_cid, raw_size, proto_node_size)
+        except Exception as err:
+            raise SDKError(f"failed to add DAG link: {str(err)}")
     
     def _build_dag_root(self, dag_root: DAGRoot) -> str:
         """Build the DAG root and return its CID"""
@@ -534,7 +499,12 @@ class StreamingAPI:
                         
             finally:
                 # Close the connection pool
-                pool.close()
+                try:
+                    err = pool.close()
+                    if err:
+                        logging.warning(f"failed to close connection pool: {err}")
+                except Exception as e:
+                    logging.warning(f"failed to close connection pool: {e}")
             
             return None
         except Exception as err:
@@ -543,7 +513,9 @@ class StreamingAPI:
     def _upload_block(self, ctx: Any, pool: ConnectionPool, block_index: int, block: FileBlockUpload, proto_chunk: Any) -> None:
         try:
             # Create a client for the node
-            client, closer = pool.create_streaming_client(block.node_address, self.use_connection_pool)
+            client, closer, err = pool.create_streaming_client(block.node_address, self.use_connection_pool)
+            if err:
+                raise SDKError(f"Failed to create streaming client: {str(err)}")
             
             try:
                 # Convert memoryview to bytes if necessary
@@ -740,7 +712,12 @@ class StreamingAPI:
                 
             finally:
                 # Close the connection pool
-                pool.close()
+                try:
+                    err = pool.close()
+                    if err:
+                        logging.warning(f"failed to close connection pool: {err}")
+                except Exception as e:
+                    logging.warning(f"failed to close connection pool: {e}")
             
             return None
         except Exception as err:
@@ -802,7 +779,12 @@ class StreamingAPI:
                 
             finally:
                 # Close the connection pool
-                pool.close()
+                try:
+                    err = pool.close()
+                    if err:
+                        logging.warning(f"failed to close connection pool: {err}")
+                except Exception as e:
+                    logging.warning(f"failed to close connection pool: {e}")
             
             return None
         except Exception as err:
@@ -829,7 +811,9 @@ class StreamingAPI:
             if block.akave is None:
                 raise SDKError("missing Akave block metadata")
             # Otherwise, fetch from Akave
-            client, closer = pool.create_streaming_client(block.akave.node_address, self.use_connection_pool)
+            client, closer, err = pool.create_streaming_client(block.akave.node_address, self.use_connection_pool)
+            if err:
+                raise SDKError(f"Failed to create streaming client: {str(err)}")
             
             try:
                 # Create download request

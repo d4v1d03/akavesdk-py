@@ -85,10 +85,10 @@ class Bucket:
 class MonkitStats:
     name: str
     successes: int
-    errors: Dict[str, int]
-    highwater: int
-    success_times: Optional[List[float]] = None
-    failure_times: Optional[List[float]] = None
+    errors: Dict[str, int]  
+    highwater: int  
+    success_times: Optional[List[float]] = None  
+    failure_times: Optional[List[float]] = None  
 
 @dataclass
 class WithRetry:
@@ -213,8 +213,7 @@ class SDK():
             return self._contract_info
             
         endpoints = [
-            'yucca.akave.ai:5500',
-            # 'connect.akave.ai:5500'  # DNS resolution failing
+             'connect.akave.ai:5500'  
         ]
         
         for endpoint in endpoints:
@@ -253,12 +252,7 @@ class SDK():
         return StreamingAPI(
             conn=self.conn,
             client=nodeapi_pb2_grpc.StreamAPIStub(self.conn),
-            erasure_code=self.streaming_erasure_code,
-            max_concurrency=self.config.max_concurrency,
-            block_part_size=self.config.block_part_size,
-            use_connection_pool=self.config.use_connection_pool,
-            encryption_key=self.config.encryption_key,
-            max_blocks_in_chunk=self.config.streaming_max_blocks_in_chunk
+            config=self.config
         )
 
     def ipc(self):
@@ -421,3 +415,31 @@ def parse_timestamp(ts) -> Optional[datetime]:
     if ts is None:
         return None
     return ts.AsTime() if hasattr(ts, "AsTime") else ts
+
+def get_monkit_stats() -> List[MonkitStats]:
+    stats = []
+    
+    placeholder_stats = [
+        MonkitStats(
+            name="sdk.upload",
+            successes=0,
+            errors={},
+            highwater=0,
+            success_times=None,
+            failure_times=None
+        ),
+        MonkitStats(
+            name="sdk.download", 
+            successes=0,
+            errors={},
+            highwater=0,
+            success_times=None,
+            failure_times=None
+        )
+    ]
+    
+    for stat in placeholder_stats:
+        if stat.successes > 0 or len(stat.errors) > 0:
+            stats.append(stat)
+    
+    return stats

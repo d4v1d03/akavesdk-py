@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-from private.pb import ipcnodeapi_pb2 as ipcnodeapi__pb2
+from private.pb import ipcnodeapi_pb2 as private_dot_pb_dot_ipcnodeapi__pb2
 
-GRPC_GENERATED_VERSION = '1.71.0'
+GRPC_GENERATED_VERSION = '1.71.2'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in ipcnodeapi_pb2_grpc.py depends on'
+        + f' but the generated code in private/pb/ipcnodeapi_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,83 +36,83 @@ class IPCNodeAPIStub(object):
         """
         self.ConnectionParams = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/ConnectionParams',
-                request_serializer=ipcnodeapi__pb2.ConnectionParamsRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.ConnectionParamsResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.ConnectionParamsRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.ConnectionParamsResponse.FromString,
                 _registered_method=True)
         self.BucketCreate = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/BucketCreate',
-                request_serializer=ipcnodeapi__pb2.IPCBucketCreateRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCBucketCreateResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketCreateRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketCreateResponse.FromString,
                 _registered_method=True)
         self.BucketView = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/BucketView',
-                request_serializer=ipcnodeapi__pb2.IPCBucketViewRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCBucketViewResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketViewRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketViewResponse.FromString,
                 _registered_method=True)
         self.BucketList = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/BucketList',
-                request_serializer=ipcnodeapi__pb2.IPCBucketListRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCBucketListResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketListRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketListResponse.FromString,
                 _registered_method=True)
         self.BucketDelete = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/BucketDelete',
-                request_serializer=ipcnodeapi__pb2.IPCBucketDeleteRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCBucketDeleteResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketDeleteRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketDeleteResponse.FromString,
                 _registered_method=True)
         self.FileUploadChunkCreate = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileUploadChunkCreate',
-                request_serializer=ipcnodeapi__pb2.IPCFileUploadChunkCreateRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileUploadChunkCreateResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadChunkCreateRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadChunkCreateResponse.FromString,
                 _registered_method=True)
         self.FileUploadBlock = channel.stream_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileUploadBlock',
-                request_serializer=ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
                 _registered_method=True)
         self.FileView = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileView',
-                request_serializer=ipcnodeapi__pb2.IPCFileViewRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileViewResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileViewRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileViewResponse.FromString,
                 _registered_method=True)
         self.FileDownloadCreate = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileDownloadCreate',
-                request_serializer=ipcnodeapi__pb2.IPCFileDownloadCreateRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadCreateRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
                 _registered_method=True)
         self.FileDownloadRangeCreate = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileDownloadRangeCreate',
-                request_serializer=ipcnodeapi__pb2.IPCFileDownloadRangeCreateRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadRangeCreateRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
                 _registered_method=True)
         self.FileDownloadChunkCreate = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileDownloadChunkCreate',
-                request_serializer=ipcnodeapi__pb2.IPCFileDownloadChunkCreateRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileDownloadChunkCreateResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadChunkCreateRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadChunkCreateResponse.FromString,
                 _registered_method=True)
         self.FileDownloadBlock = channel.unary_stream(
                 '/ipcnodeapi.IPCNodeAPI/FileDownloadBlock',
-                request_serializer=ipcnodeapi__pb2.IPCFileDownloadBlockRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileBlockData.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadBlockRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileBlockData.FromString,
                 _registered_method=True)
         self.FileList = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileList',
-                request_serializer=ipcnodeapi__pb2.IPCFileListRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileListResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListResponse.FromString,
                 _registered_method=True)
         self.FileListChunks = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileListChunks',
-                request_serializer=ipcnodeapi__pb2.IPCFileListChunksRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileListChunksResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListChunksRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListChunksResponse.FromString,
                 _registered_method=True)
         self.FileDelete = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileDelete',
-                request_serializer=ipcnodeapi__pb2.IPCFileDeleteRequest.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileDeleteResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDeleteRequest.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDeleteResponse.FromString,
                 _registered_method=True)
         self.FileUploadBlockUnary = channel.unary_unary(
                 '/ipcnodeapi.IPCNodeAPI/FileUploadBlockUnary',
-                request_serializer=ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
-                response_deserializer=ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
+                request_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
+                response_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
                 _registered_method=True)
 
 
@@ -222,83 +222,83 @@ def add_IPCNodeAPIServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'ConnectionParams': grpc.unary_unary_rpc_method_handler(
                     servicer.ConnectionParams,
-                    request_deserializer=ipcnodeapi__pb2.ConnectionParamsRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.ConnectionParamsResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.ConnectionParamsRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.ConnectionParamsResponse.SerializeToString,
             ),
             'BucketCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.BucketCreate,
-                    request_deserializer=ipcnodeapi__pb2.IPCBucketCreateRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCBucketCreateResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketCreateRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketCreateResponse.SerializeToString,
             ),
             'BucketView': grpc.unary_unary_rpc_method_handler(
                     servicer.BucketView,
-                    request_deserializer=ipcnodeapi__pb2.IPCBucketViewRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCBucketViewResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketViewRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketViewResponse.SerializeToString,
             ),
             'BucketList': grpc.unary_unary_rpc_method_handler(
                     servicer.BucketList,
-                    request_deserializer=ipcnodeapi__pb2.IPCBucketListRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCBucketListResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketListRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketListResponse.SerializeToString,
             ),
             'BucketDelete': grpc.unary_unary_rpc_method_handler(
                     servicer.BucketDelete,
-                    request_deserializer=ipcnodeapi__pb2.IPCBucketDeleteRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCBucketDeleteResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketDeleteRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketDeleteResponse.SerializeToString,
             ),
             'FileUploadChunkCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileUploadChunkCreate,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileUploadChunkCreateRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileUploadChunkCreateResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadChunkCreateRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadChunkCreateResponse.SerializeToString,
             ),
             'FileUploadBlock': grpc.stream_unary_rpc_method_handler(
                     servicer.FileUploadBlock,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileBlockData.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileUploadBlockResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileBlockData.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadBlockResponse.SerializeToString,
             ),
             'FileView': grpc.unary_unary_rpc_method_handler(
                     servicer.FileView,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileViewRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileViewResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileViewRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileViewResponse.SerializeToString,
             ),
             'FileDownloadCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDownloadCreate,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileDownloadCreateRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileDownloadCreateResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadCreateRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadCreateResponse.SerializeToString,
             ),
             'FileDownloadRangeCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDownloadRangeCreate,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileDownloadRangeCreateRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileDownloadCreateResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadRangeCreateRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadCreateResponse.SerializeToString,
             ),
             'FileDownloadChunkCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDownloadChunkCreate,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileDownloadChunkCreateRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileDownloadChunkCreateResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadChunkCreateRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadChunkCreateResponse.SerializeToString,
             ),
             'FileDownloadBlock': grpc.unary_stream_rpc_method_handler(
                     servicer.FileDownloadBlock,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileDownloadBlockRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadBlockRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
             ),
             'FileList': grpc.unary_unary_rpc_method_handler(
                     servicer.FileList,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileListRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileListResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListResponse.SerializeToString,
             ),
             'FileListChunks': grpc.unary_unary_rpc_method_handler(
                     servicer.FileListChunks,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileListChunksRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileListChunksResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListChunksRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListChunksResponse.SerializeToString,
             ),
             'FileDelete': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDelete,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileDeleteRequest.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileDeleteResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDeleteRequest.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDeleteResponse.SerializeToString,
             ),
             'FileUploadBlockUnary': grpc.unary_unary_rpc_method_handler(
                     servicer.FileUploadBlockUnary,
-                    request_deserializer=ipcnodeapi__pb2.IPCFileBlockData.FromString,
-                    response_serializer=ipcnodeapi__pb2.IPCFileUploadBlockResponse.SerializeToString,
+                    request_deserializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileBlockData.FromString,
+                    response_serializer=private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadBlockResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -326,8 +326,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/ConnectionParams',
-            ipcnodeapi__pb2.ConnectionParamsRequest.SerializeToString,
-            ipcnodeapi__pb2.ConnectionParamsResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.ConnectionParamsRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.ConnectionParamsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -353,8 +353,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/BucketCreate',
-            ipcnodeapi__pb2.IPCBucketCreateRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCBucketCreateResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketCreateRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -380,8 +380,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/BucketView',
-            ipcnodeapi__pb2.IPCBucketViewRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCBucketViewResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketViewRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketViewResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -407,8 +407,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/BucketList',
-            ipcnodeapi__pb2.IPCBucketListRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCBucketListResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketListRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketListResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -434,8 +434,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/BucketDelete',
-            ipcnodeapi__pb2.IPCBucketDeleteRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCBucketDeleteResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketDeleteRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCBucketDeleteResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -461,8 +461,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileUploadChunkCreate',
-            ipcnodeapi__pb2.IPCFileUploadChunkCreateRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCFileUploadChunkCreateResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadChunkCreateRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadChunkCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -488,8 +488,8 @@ class IPCNodeAPI(object):
             request_iterator,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileUploadBlock',
-            ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
-            ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -515,8 +515,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileView',
-            ipcnodeapi__pb2.IPCFileViewRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCFileViewResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileViewRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileViewResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -542,8 +542,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileDownloadCreate',
-            ipcnodeapi__pb2.IPCFileDownloadCreateRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadCreateRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -569,8 +569,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileDownloadRangeCreate',
-            ipcnodeapi__pb2.IPCFileDownloadRangeCreateRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadRangeCreateRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -596,8 +596,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileDownloadChunkCreate',
-            ipcnodeapi__pb2.IPCFileDownloadChunkCreateRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCFileDownloadChunkCreateResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadChunkCreateRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadChunkCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -623,8 +623,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileDownloadBlock',
-            ipcnodeapi__pb2.IPCFileDownloadBlockRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCFileBlockData.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDownloadBlockRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileBlockData.FromString,
             options,
             channel_credentials,
             insecure,
@@ -650,8 +650,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileList',
-            ipcnodeapi__pb2.IPCFileListRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCFileListResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -677,8 +677,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileListChunks',
-            ipcnodeapi__pb2.IPCFileListChunksRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCFileListChunksResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListChunksRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileListChunksResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -704,8 +704,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileDelete',
-            ipcnodeapi__pb2.IPCFileDeleteRequest.SerializeToString,
-            ipcnodeapi__pb2.IPCFileDeleteResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDeleteRequest.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileDeleteResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -731,8 +731,8 @@ class IPCNodeAPI(object):
             request,
             target,
             '/ipcnodeapi.IPCNodeAPI/FileUploadBlockUnary',
-            ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
-            ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileBlockData.SerializeToString,
+            private_dot_pb_dot_ipcnodeapi__pb2.IPCFileUploadBlockResponse.FromString,
             options,
             channel_credentials,
             insecure,

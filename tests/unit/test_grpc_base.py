@@ -336,3 +336,4 @@ class TestGrpcClientBaseIntegration:
         
         assert mock_logging.warning.called or mock_logging.error.called
 
+

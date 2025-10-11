@@ -289,7 +289,8 @@ def _create_chunk_dag_root_node(blocks: List[FileBlockUpload], pb_links: List = 
         digest = multihash.digest(encoded_bytes, "sha2-256")
         cid = CID("base32", CID_VERSION, dag_pb_code, digest)
         
-        return cid, len(encoded_bytes)
+        total_size = sum(len(block.data) for block in blocks)
+        return cid, total_size
         
     except Exception as e:
         combined_data = b"".join([block.data for block in blocks])

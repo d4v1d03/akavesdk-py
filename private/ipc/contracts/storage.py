@@ -2259,24 +2259,30 @@ class StorageContract:
         
         return tx_hash.hex()
 
-    def commit_file(self, bucket_name: str, file_name: str, size: int, root_cid: bytes, from_address: HexAddress, private_key: str) -> None:
+    def commit_file(self, bucket_id: bytes, file_name: str, encoded_size: int, actual_size: int, root_cid: bytes, from_address: HexAddress, private_key: str) -> None:
         """Updates the file metadata after upload using new ABI signature.
         
         Args:
-            bucket_name: Name of the bucket containing the file
+            bucket_id: ID of the bucket (bytes32)
             file_name: Name of the file
-            size: Final size of the file in bytes
+            encoded_size: Size after erasure coding in bytes
+            actual_size: Original file size in bytes
             root_cid: Root CID of the uploaded file
             from_address: Address committing the file
             private_key: Private key for signing the transaction
         """
-        # First get bucket to get bucket ID
-        bucket = self.contract.functions.getBucketByName(bucket_name).call()
-        bucket_id = bucket[0]  # bytes32 id
+        # Ensure bucket_id is bytes32
+        if isinstance(bucket_id, str):
+            if bucket_id.startswith('0x'):
+                bucket_id = bytes.fromhex(bucket_id[2:])
+            else:
+                bucket_id = bytes.fromhex(bucket_id)
+        
+        if len(bucket_id) != 32:
+            raise ValueError(f"bucket_id must be 32 bytes, got {len(bucket_id)}")
         
         # commitFile signature: commitFile(bucketId, name, encodedFileSize, actualSize, fileCID)
-        # We'll use size for both encodedFileSize and actualSize
-        tx = self.contract.functions.commitFile(bucket_id, file_name, size, size, root_cid).build_transaction({
+        tx = self.contract.functions.commitFile(bucket_id, file_name, encoded_size, actual_size, root_cid).build_transaction({
             'from': from_address,
             'gas': 500000,  # Gas limit (adjust as needed)
             'gasPrice': self.web3.eth.gas_price,
@@ -2292,7 +2298,15 @@ class StorageContract:
         # Wait for receipt
         receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
         if receipt.status != 1:
-            raise Exception("Transaction failed for commitFile")
+            print(f"[COMMIT_FILE_ERROR] Transaction receipt: {receipt}")
+            print(f"[COMMIT_FILE_ERROR] Status: {receipt.status}")
+            print(f"[COMMIT_FILE_ERROR] Gas used: {receipt.gasUsed}")
+            print(f"[COMMIT_FILE_ERROR] Bucket ID: {bucket_id.hex()}")
+            print(f"[COMMIT_FILE_ERROR] File name: {file_name}")
+            print(f"[COMMIT_FILE_ERROR] Encoded size: {encoded_size}")
+            print(f"[COMMIT_FILE_ERROR] Actual size: {actual_size}")
+            print(f"[COMMIT_FILE_ERROR] Root CID: {root_cid.hex()}")
+            raise Exception(f"Transaction failed for commitFile. Status: {receipt.status}, Gas used: {receipt.gasUsed}")
 
     def delete_bucket(self, bucket_name: str, from_address: HexAddress, private_key: str, bucket_id_hex: str = None) -> HexStr:
         if not bucket_id_hex:

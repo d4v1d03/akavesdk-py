@@ -447,3 +447,4 @@ class TestSplitterIntegration:
             assert isinstance(chunk, bytes)
             assert len(chunk) > 0
 
+

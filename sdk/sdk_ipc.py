@@ -5,6 +5,8 @@ import io
 import math
 import concurrent.futures
 import secrets
+import threading
+import queue
 from hashlib import sha256
 from typing import List, Optional, Callable, Dict, Any, Union, Tuple
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -19,8 +21,13 @@ from .model import (
     IPCBucketCreateResult, IPCBucket, IPCFileMeta, IPCFileListItem,
     IPCFileMetaV2, IPCFileChunkUploadV2, AkaveBlockData, FileBlockUpload,
     FileBlockDownload, Chunk, IPCFileDownload, FileChunkDownload,
-    IPCFileUpload, new_ipc_file_upload, TxWaitSignal, UploadState
+    IPCFileUpload, new_ipc_file_upload, UploadState
 )
+
+class TxWaitSignal:
+    def __init__(self, FileUploadChunk, Transaction):
+        self.FileUploadChunk = FileUploadChunk
+        self.Transaction = Transaction
 from private.encryption import encrypt, derive_key, decrypt
 from private.pb import ipcnodeapi_pb2, ipcnodeapi_pb2_grpc
 
@@ -48,7 +55,6 @@ def encryption_key(parent_key: bytes, *info_data: str):
     return derive_key(parent_key, info.encode())
 
 def maybe_encrypt_metadata(value: str, derivation_path: str, encryption_key: bytes) -> str:
-    """Encrypt metadata if encryption key is provided, matching Go implementation"""
     if len(encryption_key) == 0:
         return value
     
@@ -60,11 +66,10 @@ def maybe_encrypt_metadata(value: str, derivation_path: str, encryption_key: byt
         raise SDKError(f"failed to encrypt metadata: {str(e)}")
 
 def to_ipc_proto_chunk(chunk_cid, index: int, size: int, blocks):
-    """Convert to IPC proto chunk format matching Go implementation"""
     from private.pb import ipcnodeapi_pb2
     
-    cids = []  # [][32]byte
-    sizes = []  
+    cids = []
+    sizes = []
     
     if hasattr(chunk_cid, '__str__'):
         chunk_cid_str = str(chunk_cid)
@@ -138,6 +143,9 @@ class IPC:
         self.max_blocks_in_chunk = config.streaming_max_blocks_in_chunk
         self.erasure_code = config.erasure_code
         self.chunk_buffer = config.chunk_buffer
+        
+        from .sdk import WithRetry
+        self.with_retry = WithRetry()
 
     def create_bucket(self, ctx, name: str) -> IPCBucketCreateResult:
         if len(name) < MIN_BUCKET_NAME_LENGTH:
@@ -308,6 +316,8 @@ class IPC:
                 name=response.file_name if hasattr(response, 'file_name') else file_name,
                 bucket_name=response.bucket_name if hasattr(response, 'bucket_name') else bucket_name,
                 encoded_size=response.encoded_size if hasattr(response, 'encoded_size') else 0,
+                actual_size=response.actual_size if hasattr(response, 'actual_size') else 0,
+                is_public=response.is_public if hasattr(response, 'is_public') else False,
                 created_at=created_at
             )
         except grpc.RpcError as e:
@@ -370,14 +380,14 @@ class IPC:
             encrypted_file_name = file_name
             encrypted_bucket_name = bucket_name
             
-            bucket = self.ipc.storage.get_bucket_by_name(
-                {"from": self.ipc.auth.address},
-                encrypted_bucket_name
-            )
-            if not bucket:
-                raise SDKError("failed to retrieve bucket")
+            bucket_info = self.view_bucket(None, encrypted_bucket_name)
+            if not bucket_info:
+                raise SDKError(f"bucket '{bucket_name}' not found")
             
-            bucket_id = bucket[0]  # bytes32 id
+            bucket_id_hex = bucket_info.id
+            if bucket_id_hex.startswith('0x'):
+                bucket_id_hex = bucket_id_hex[2:]
+            bucket_id = bytes.fromhex(bucket_id_hex)
             
             file_info = self.ipc.storage.get_file_by_name(
                 {}, 
@@ -388,11 +398,18 @@ class IPC:
                 raise SDKError("failed to retrieve file - file does not exist")
             
             file_id = file_info[0]  # bytes32 file ID
-            file_index = self.ipc.storage.get_file_index_by_id(
-                {},
-                bucket_name,
-                file_id 
-            )
+            try:
+                file_index = self.ipc.storage.get_file_index_by_id(
+                    {"from": self.ipc.auth.address},
+                    bucket_name,
+                    file_id 
+                )
+            except Exception as index_err:
+                raise SDKError(f"failed to retrieve file index - file may not exist: {index_err}")
+
+            # Validate that we got a valid index
+            if file_index is None or file_index < 0:
+                raise SDKError("invalid file index returned from contract")
             
             logging.info(f"Deleting file with file_id: {file_id.hex() if isinstance(file_id, bytes) else file_id}, bucket_id: {bucket_id.hex() if isinstance(bucket_id, bytes) else bucket_id}, name: {encrypted_file_name}, index: {file_index}")
             tx_hash = self.ipc.storage.delete_file(
@@ -419,31 +436,21 @@ class IPC:
         
         try:
             encrypted_file_name = maybe_encrypt_metadata(file_name, bucket_name + "/" + file_name, self.encryption_key)
-            encrypted_bucket_name = maybe_encrypt_metadata(bucket_name, bucket_name, self.encryption_key)
+            encrypted_bucket_name = maybe_encrypt_metadata(bucket_name, file_name, self.encryption_key)
             
             file_upload = new_ipc_file_upload(bucket_name, file_name)
             
-            bucket = None
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    bucket = self.ipc.storage.get_bucket_by_name(
-                        {"from": self.ipc.auth.address},
-                        encrypted_bucket_name
-                    )
-                    if bucket:
-                        break
-                except Exception as e:
-                    if attempt == max_retries - 1:
-                        raise SDKError(f"failed to get bucket after {max_retries} attempts: {str(e)}")
-                    time.sleep(1 * (attempt + 1))  # Exponential backoff
-        
-            if not bucket:
-                raise SDKError("failed to retrieve bucket")
+            bucket_info = self.view_bucket(None, encrypted_bucket_name)
+            if not bucket_info:
+                raise SDKError(f"bucket '{bucket_name}' not found")
             
-            bucket_id = bucket[0]
+            bucket_id_hex = bucket_info.id
+            if bucket_id_hex.startswith('0x'):
+                bucket_id_hex = bucket_id_hex[2:]
+            bucket_id = bytes.fromhex(bucket_id_hex)
             
             tx_hash = None
+            max_retries = 3
             for attempt in range(max_retries):
                 try:
                     tx_hash = self.ipc.storage.create_file(
@@ -479,7 +486,8 @@ class IPC:
             logging.error(f"IPC create_file_upload failed: {err}")
             raise SDKError(f"failed to create file upload: {err}")
 
-    def upload_with_file_upload(self, ctx, file_upload: IPCFileUpload, reader: io.IOBase) -> IPCFileMetaV2:
+    def _upload_parallel(self, ctx, file_upload: IPCFileUpload, reader: io.IOBase) -> IPCFileMetaV2:
+        return self._upload_full_parallel(ctx, file_upload, reader)
         try:
             if file_upload is None:
                 raise SDKError("empty file upload")
@@ -489,52 +497,389 @@ class IPC:
                 raise SDKError("empty bucket name")
             if not file_upload.name:
                 raise SDKError("empty file name")
-            
+
             is_continuation = file_upload.state.chunk_count > 0
-            
+
             encrypted_file_name = maybe_encrypt_metadata(file_upload.name, file_upload.bucket_name + "/" + file_upload.name, self.encryption_key)
-            encrypted_bucket_name = maybe_encrypt_metadata(file_upload.bucket_name, file_upload.bucket_name, self.encryption_key)
-            
+            encrypted_bucket_name = maybe_encrypt_metadata(file_upload.bucket_name, file_upload.name, self.encryption_key)
+
             bucket = None
-            max_retries = 3
-            for attempt in range(max_retries):
+
+            def get_bucket_call():
+                nonlocal bucket
                 try:
                     bucket = self.ipc.storage.get_bucket_by_name(
-                        {"from": self.ipc.auth.address},
-                        encrypted_bucket_name
+                        call_opts={'from': self.ipc.auth.address},
+                        bucket_name=encrypted_bucket_name,
+                        owner_address=self.ipc.auth.address,
+                        file_offset=0,
+                        file_limit=0
                     )
-                    if bucket:
-                        break
+                    return (False, None)
                 except Exception as e:
-                    if attempt == max_retries - 1:
-                        raise SDKError(f"failed to get bucket after {max_retries} attempts: {str(e)}")
-                    time.sleep(1 * (attempt + 1))
-            
-            if not bucket:
-                raise SDKError("failed to retrieve bucket")
-            
+                    return (True, e)
+
+            retry_err = self.with_retry.do(None, get_bucket_call)
+            if retry_err:
+                raise SDKError(f"failed to get bucket: {str(retry_err)}")
+
+            if not bucket or len(bucket) == 0 or not bucket[0]:
+                raise SDKError(f"bucket '{file_upload.bucket_name}' not found")
+
             bucket_id = bucket[0]
-            
+
             chunk_enc_overhead = 0
             file_enc_key = encryption_key(self.encryption_key, encrypted_bucket_name, encrypted_file_name)
             if len(file_enc_key) > 0:
                 chunk_enc_overhead = EncryptionOverhead
-            
+
             buffer_size = self.max_blocks_in_chunk * int(BlockSize)
-            if self.erasure_code:  
+            if self.erasure_code:
                 buffer_size = self.erasure_code.data_blocks * int(BlockSize)
             buffer_size -= chunk_enc_overhead
-            
+
             if is_continuation:
                 from .sdk import skip_to_position
                 skip_to_position(reader, file_upload.state.actual_file_size)
-            
+
+            return self._upload_full_parallel(ctx, file_upload, reader, bucket_id, encrypted_file_name,
+                                            encrypted_bucket_name, file_enc_key, buffer_size)
+
+        except Exception as err:
+            logging.error(f"IPC Upload failed: {err}")
+            raise SDKError(f"upload failed: {str(err)}")
+
+    def _upload_full_parallel(self, ctx, file_upload: IPCFileUpload, reader: io.IOBase, bucket_id: bytes,
+                             encrypted_file_name: str, encrypted_bucket_name: str, file_enc_key: bytes,
+                             buffer_size: int) -> IPCFileMetaV2:
+
+        transaction_queue = queue.Queue(maxsize=self.chunk_buffer)
+        upload_queue = queue.Queue(maxsize=self.chunk_buffer)
+        result_queue = queue.Queue()
+
+        stop_event = threading.Event()
+        completed_event = threading.Event()
+
+        class Counters:
+            def __init__(self):
+                self.chunks_processed = 0
+                self.blocks_uploaded = 0
+                self.errors = []
+
+        counters = Counters()
+
+
+        results = {
+            'root_cid': None,
+            'file_meta': None,
+            'file_id': None,
+            'error': None
+        }
+
+        def chunk_reader_thread():
+            try:
+                chunk_index = file_upload.state.chunk_count
+
+                while not stop_event.is_set():
+                    chunk_data = bytearray(buffer_size)
+                    bytes_read = 0
+
+                    while bytes_read < buffer_size:
+                        try:
+                            n = reader.readinto(memoryview(chunk_data)[bytes_read:])
+                            if n == 0 or n is None:
+                                break
+                            bytes_read += n
+                        except Exception as e:
+                            if bytes_read == 0:
+                                counters.errors.append(SDKError(f"failed to read from reader: {str(e)}"))
+                                stop_event.set()
+                                return
+                            break
+
+                    if bytes_read == 0:
+                        if chunk_index == 0:
+                            results['error'] = SDKError("empty file")
+                            stop_event.set()
+                            return
+                        break
+
+                    chunk_upload = self.create_chunk_upload(ctx, chunk_index, file_enc_key,
+                                                          chunk_data[:bytes_read], bucket_id,
+                                                          encrypted_file_name)
+
+                    cids, sizes, proto_chunk, error = to_ipc_proto_chunk(
+                        chunk_upload.chunk_cid, chunk_upload.index, chunk_upload.actual_size,
+                        chunk_upload.blocks)
+                    if error:
+                        results['error'] = error
+                        stop_event.set()
+                        return
+
+                    tx_hash = None
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            tx_hash = self.ipc.storage.add_file_chunk(
+                                self.ipc.auth.address, self.ipc.auth.key,
+                                self._convert_cid_to_bytes(chunk_upload.chunk_cid),
+                                bucket_id, encrypted_file_name, chunk_upload.encoded_size,
+                                cids, sizes, chunk_upload.index, nonce_manager=None)
+                            break
+                        except Exception as e:
+                            error_msg = str(e).lower()
+                            is_retryable = any(retry_phrase in error_msg for retry_phrase in [
+                                "nonce too low", "replacement transaction underpriced", "eof"])
+                            if is_retryable and attempt < max_retries - 1:
+                                time.sleep(0.5 * (2 ** attempt))
+                                continue
+                            else:
+                                results['error'] = SDKError(f"failed to add file chunk: {str(e)}")
+                                stop_event.set()
+                                return
+
+                    if hasattr(self.ipc, 'wait_for_tx') and tx_hash:
+                        self.ipc.wait_for_tx(tx_hash)
+                    elif hasattr(self.ipc, 'web3') and tx_hash:
+                        receipt = self.ipc.eth.eth.wait_for_transaction_receipt(tx_hash)
+                        if receipt.status != 1:
+                            results['error'] = SDKError("AddFileChunk transaction failed")
+                            stop_event.set()
+                            return
+
+                    file_upload.state.pre_create_chunk(chunk_upload, tx_hash)
+
+                    try:
+                        transaction_queue.put(TxWaitSignal(FileUploadChunk=chunk_upload, Transaction=tx_hash), timeout=1)
+                    except queue.Full:
+                        results['error'] = SDKError("transaction queue full")
+                        stop_event.set()
+                        return
+
+                    chunk_index += 1
+
+            except Exception as e:
+                results['error'] = e
+                stop_event.set()
+
+        def transaction_waiter_thread():
+            try:
+                while not stop_event.is_set():
+                    try:
+                        tx_signal = transaction_queue.get(timeout=1)
+                        if tx_signal is None:
+                            break
+
+                        if hasattr(self.ipc, 'wait_for_tx'):
+                            self.ipc.wait_for_tx(tx_signal.Transaction)
+                        elif hasattr(self.ipc, 'web3'):
+                            receipt = self.ipc.eth.eth.wait_for_transaction_receipt(tx_signal.Transaction)
+                            if receipt.status != 1:
+                                results['error'] = SDKError("transaction confirmation failed")
+                                stop_event.set()
+                                return
+
+                        try:
+                            upload_queue.put(tx_signal.FileUploadChunk, timeout=1)
+                        except queue.Full:
+                            results['error'] = SDKError("upload queue full")
+                            stop_event.set()
+                            return
+
+                        transaction_queue.task_done()
+
+                    except queue.Empty:
+                        continue
+                    except Exception as e:
+                        results['error'] = e
+                        stop_event.set()
+                        return
+
+            except Exception as e:
+                results['error'] = e
+                stop_event.set()
+
+        def chunk_uploader_thread():
+            try:
+                pool = ConnectionPool()
+
+                while not stop_event.is_set():
+                    try:
+                        chunk_upload = upload_queue.get(timeout=1)
+                        if chunk_upload is None:
+                            break
+
+                        err = self.upload_chunk(ctx, chunk_upload)
+                        if err is not None:
+                            results['error'] = err
+                            stop_event.set()
+                            return
+
+                        file_upload.state.chunk_uploaded(chunk_upload)
+                        file_upload.chunks_counter += 1
+
+                        upload_queue.task_done()
+
+                    except queue.Empty:
+                        continue
+                    except Exception as e:
+                        results['error'] = e
+                        stop_event.set()
+                        return
+
+            except Exception as e:
+                results['error'] = e
+                stop_event.set()
+
+        threads = [
+            threading.Thread(target=chunk_reader_thread, daemon=True),
+            threading.Thread(target=transaction_waiter_thread, daemon=True),
+            threading.Thread(target=chunk_uploader_thread, daemon=True)
+        ]
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        if results['error']:
+            raise results['error']
+
+        root_cid = file_upload.state.dag_root.build()
+
+        file_meta = self.ipc.storage.get_file_by_name(
+            {"from": self.ipc.auth.address}, bucket_id, encrypted_file_name)
+
+        file_id = self._calculate_file_id(bucket_id, encrypted_file_name)
+
+        is_filled = False
+        max_wait_time = 50
+        wait_start = time.time()
+
+        while not is_filled:
+            try:
+                is_filled = self.ipc.storage.is_file_filled(file_id)
+                if is_filled:
+                    break
+            except Exception as e:
+                logging.warning(f"IsFileFilled check failed: {e}")
+                time.sleep(2)
+                break
+
+            if time.time() - wait_start > max_wait_time:
+                raise SDKError("timeout waiting for file to be filled")
+            time.sleep(1)
+
+        tx_hash = None
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                root_cid_bytes = self._convert_cid_to_bytes(root_cid)
+                bucket_info = self.view_bucket(None, encrypted_bucket_name)
+                if not bucket_info:
+                    raise SDKError(f"bucket '{file_upload.bucket_name}' not found during commit")
+
+                tx_hash = self.ipc.storage.commit_file(
+                    bucket_info.name, encrypted_file_name,
+                    file_upload.state.actual_file_size, root_cid_bytes,
+                    self.ipc.auth.address, self.ipc.auth.key)
+                break
+            except Exception as e:
+                error_msg = str(e).lower()
+                is_retryable = any(retry_phrase in error_msg for retry_phrase in [
+                    "nonce too low", "replacement transaction underpriced", "eof"])
+                if is_retryable and attempt < max_retries - 1:
+                    time.sleep(0.5 * (2 ** attempt))
+                    continue
+                else:
+                    raise SDKError(f"failed to commit file: {str(e)}")
+
+        if hasattr(self.ipc, 'wait_for_tx') and tx_hash:
+            self.ipc.wait_for_tx(tx_hash)
+        elif hasattr(self.ipc, 'web3') and tx_hash:
+            receipt = self.ipc.eth.eth.wait_for_transaction_receipt(tx_hash)
+            if receipt.status != 1:
+                raise SDKError("CommitFile transaction failed")
+
+        file_upload.state.is_committed = True
+
+        return IPCFileMetaV2(
+            root_cid=str(root_cid),
+            bucket_name=encrypted_bucket_name,
+            name=encrypted_file_name,
+            encoded_size=file_upload.state.encoded_file_size,
+            size=file_upload.state.actual_file_size,
+            created_at=time.time() if file_meta else None,
+            committed_at=time.time()
+        )
+
+    def upload(self, ctx, bucket_name: str, file_name: str, reader: io.IOBase) -> IPCFileMetaV2:
+        try:
+            file_upload = self.create_file_upload(ctx, bucket_name, file_name)
+
+            is_continuation = file_upload.state.chunk_count > 0
+
+            encrypted_file_name = maybe_encrypt_metadata(file_upload.name, file_upload.bucket_name + "/" + file_upload.name, self.encryption_key)
+            encrypted_bucket_name = maybe_encrypt_metadata(file_upload.bucket_name, file_upload.name, self.encryption_key)
+
+            bucket = None
+
+            def get_bucket_call():
+                nonlocal bucket
+                try:
+                    bucket = self.ipc.storage.get_bucket_by_name(
+                        call_opts={'from': self.ipc.auth.address},
+                        bucket_name=encrypted_bucket_name,
+                        owner_address=self.ipc.auth.address,
+                        file_offset=0,
+                        file_limit=0
+                    )
+                    return (False, None)
+                except Exception as e:
+                    return (True, e)
+
+            retry_err = self.with_retry.do(None, get_bucket_call)
+            if retry_err:
+                raise SDKError(f"failed to get bucket: {str(retry_err)}")
+
+            if not bucket or len(bucket) == 0 or not bucket[0]:
+                raise SDKError(f"bucket '{file_upload.bucket_name}' not found")
+
+            bucket_id = bucket[0]
+
+            chunk_enc_overhead = 0
+            file_enc_key = encryption_key(self.encryption_key, encrypted_bucket_name, encrypted_file_name)
+            if len(file_enc_key) > 0:
+                chunk_enc_overhead = EncryptionOverhead
+
+            buffer_size = self.max_blocks_in_chunk * int(BlockSize)
+            if self.erasure_code:
+                buffer_size = self.erasure_code.data_blocks * int(BlockSize)
+            buffer_size -= chunk_enc_overhead
+
+            if is_continuation:
+                from .sdk import skip_to_position
+                skip_to_position(reader, file_upload.state.actual_file_size)
+
+            return self._upload_with_comprehensive_debug(ctx, file_upload, reader, bucket_id, encrypted_file_name,
+                                                        encrypted_bucket_name, file_enc_key, buffer_size)
+
+        except Exception as err:
+            logging.error(f"IPC upload failed: {err}")
+            raise SDKError(f"upload failed: {str(err)}")
+
+    def _upload_with_comprehensive_debug(self, ctx, file_upload: IPCFileUpload, reader: io.IOBase, bucket_id: bytes,
+                                        encrypted_file_name: str, encrypted_bucket_name: str, file_enc_key: bytes,
+                                        buffer_size: int) -> IPCFileMetaV2:
+        try:
             chunk_index = file_upload.state.chunk_count
-            
+            total_chunks_uploaded = 0
+
             while True:
                 chunk_data = bytearray(buffer_size)
                 bytes_read = 0
-                
+
                 while bytes_read < buffer_size:
                     try:
                         n = reader.readinto(memoryview(chunk_data)[bytes_read:])
@@ -545,130 +890,108 @@ class IPC:
                         if bytes_read == 0:
                             raise SDKError(f"failed to read from reader: {str(e)}")
                         break
-                
+
                 if bytes_read == 0:
-                    if chunk_index == file_upload.state.chunk_count and file_upload.state.chunk_count == 0:
+                    if chunk_index == 0:
                         raise SDKError("empty file")
                     break
                 
-                chunk_upload = self.create_chunk_upload(ctx, chunk_index, file_enc_key, chunk_data[:bytes_read], bucket_id, encrypted_file_name)
-                
+                chunk_upload = self.create_chunk_upload(ctx, chunk_index, file_enc_key,
+                                                      chunk_data[:bytes_read], bucket_id,
+                                                      encrypted_file_name)
+
                 cids, sizes, proto_chunk, error = to_ipc_proto_chunk(
-                    chunk_upload.chunk_cid,
-                    chunk_upload.index,
-                    chunk_upload.actual_size,
-                    chunk_upload.blocks
-                )
+                    chunk_upload.chunk_cid, chunk_upload.index, chunk_upload.actual_size,
+                    chunk_upload.blocks)
                 if error:
                     raise error
-                
+
                 tx_hash = None
+                max_retries = 3
                 for attempt in range(max_retries):
                     try:
                         tx_hash = self.ipc.storage.add_file_chunk(
-                            self.ipc.auth.address,
-                            self.ipc.auth.key,
+                            self.ipc.auth.address, self.ipc.auth.key,
                             self._convert_cid_to_bytes(chunk_upload.chunk_cid),
-                            bucket_id,
-                            encrypted_file_name,
-                            chunk_upload.encoded_size,
-                            cids,
-                            sizes,
-                            chunk_index,
-                            nonce_manager=None
-                        )
+                            bucket_id, encrypted_file_name, chunk_upload.encoded_size,
+                            cids, sizes, chunk_upload.index, nonce_manager=None)
                         break
                     except Exception as e:
                         error_msg = str(e).lower()
                         is_retryable = any(retry_phrase in error_msg for retry_phrase in [
-                            "nonce too low", "replacement transaction underpriced", "eof"
-                        ])
+                            "nonce too low", "replacement transaction underpriced", "eof"])
                         if is_retryable and attempt < max_retries - 1:
                             time.sleep(0.5 * (2 ** attempt))
                             continue
                         else:
                             raise SDKError(f"failed to add file chunk: {str(e)}")
-                
+
                 if hasattr(self.ipc, 'wait_for_tx') and tx_hash:
                     self.ipc.wait_for_tx(tx_hash)
                 elif hasattr(self.ipc, 'web3') and tx_hash:
                     receipt = self.ipc.eth.eth.wait_for_transaction_receipt(tx_hash)
                     if receipt.status != 1:
-                        raise SDKError("AddFileChunk transaction failed")
-                
+                        raise SDKError(f"AddFileChunk transaction failed: {tx_hash}")
+
                 file_upload.state.pre_create_chunk(chunk_upload, tx_hash)
                 
-                self.upload_chunk(ctx, chunk_upload)
-                
+                err = self.upload_chunk(ctx, chunk_upload)
+                if err is not None:
+                    raise err
+
                 file_upload.state.chunk_uploaded(chunk_upload)
-                file_upload.chunks_counter += 1
-                
+                total_chunks_uploaded += 1
                 chunk_index += 1
-                
-                if bytes_read < buffer_size:
-                    break
-            
+
+                time.sleep(0.1)
+
             root_cid = file_upload.state.dag_root.build()
-            
             file_meta = self.ipc.storage.get_file_by_name(
-                {"from": self.ipc.auth.address},
-                bucket_id,
-                encrypted_file_name
-            )
-            
+                {"from": self.ipc.auth.address}, bucket_id, encrypted_file_name)
             file_id = self._calculate_file_id(bucket_id, encrypted_file_name)
+
             is_filled = False
-            max_wait_time = 300
+            max_wait_time = 60
             wait_start = time.time()
-            
+
             while not is_filled:
                 try:
-                    is_filled = self.ipc.storage.is_file_filled({"from": self.ipc.auth.address}, file_id)
+                    is_filled = self.ipc.storage.is_file_filled(file_id)
                     if is_filled:
                         break
                 except Exception as e:
                     logging.warning(f"IsFileFilled check failed: {e}")
                     time.sleep(2)
                     break
-                
+
                 if time.time() - wait_start > max_wait_time:
                     raise SDKError("timeout waiting for file to be filled")
+                
                 time.sleep(1)
+
+            root_cid_bytes = self._convert_cid_to_bytes(root_cid)
+            bucket_info = self.view_bucket(None, encrypted_bucket_name)
+            if not bucket_info:
+                raise SDKError(f"bucket '{file_upload.bucket_name}' not found during commit")
+
+            bucket_id_bytes = bytes.fromhex(bucket_info.id) if isinstance(bucket_info.id, str) else bucket_info.id
             
-            tx_hash = None
-            for attempt in range(max_retries):
-                try:
-                    root_cid_bytes = self._convert_cid_to_bytes(root_cid)
-                    tx_hash = self.ipc.storage.commit_file(
-                        self.ipc.auth.address,
-                        self.ipc.auth.key,
-                        bucket_id,
-                        encrypted_file_name,
-                        file_upload.state.encoded_file_size,
-                        file_upload.state.actual_file_size,
-                        root_cid_bytes
-                    )
-                    break
-                except Exception as e:
-                    error_msg = str(e).lower()
-                    is_retryable = any(retry_phrase in error_msg for retry_phrase in [
-                        "nonce too low", "replacement transaction underpriced", "eof"
-                    ])
-                    if is_retryable and attempt < max_retries - 1:
-                        time.sleep(0.5 * (2 ** attempt))
-                        continue
-                    else:
-                        raise SDKError(f"failed to commit file: {str(e)}")
-            
+            tx_hash = self.ipc.storage.commit_file(
+                bucket_id_bytes, encrypted_file_name,
+                file_upload.state.encoded_file_size,
+                file_upload.state.actual_file_size,
+                root_cid_bytes,
+                self.ipc.auth.address, self.ipc.auth.key)
+
             if hasattr(self.ipc, 'wait_for_tx') and tx_hash:
                 self.ipc.wait_for_tx(tx_hash)
             elif hasattr(self.ipc, 'web3') and tx_hash:
                 receipt = self.ipc.eth.eth.wait_for_transaction_receipt(tx_hash)
                 if receipt.status != 1:
                     raise SDKError("CommitFile transaction failed")
-            
+
             file_upload.state.is_committed = True
-            
+
             return IPCFileMetaV2(
                 root_cid=str(root_cid),
                 bucket_name=encrypted_bucket_name,
@@ -678,20 +1001,87 @@ class IPC:
                 created_at=time.time() if file_meta else None,
                 committed_at=time.time()
             )
-            
-        except Exception as err:
-            logging.error(f"IPC upload_with_file_upload failed: {err}")
-            raise SDKError(f"upload failed: {str(err)}")
 
-    def upload(self, ctx, bucket_name: str, file_name: str, reader: io.IOBase) -> IPCFileMetaV2:
-        try:
-            file_upload = self.create_file_upload(ctx, bucket_name, file_name)
-            return self.upload_with_file_upload(ctx, file_upload, reader)
-            
         except Exception as err:
-            logging.error(f"IPC upload failed: {err}")
             raise SDKError(f"upload failed: {str(err)}")
     
+    def _create_fill_chunk_blocks_args(self, chunk_upload: IPCFileChunkUploadV2, bucket_id: bytes) -> list:
+        try:
+            fill_args = []
+            deadline = int(time.time() + 24 * 60 * 60)
+            
+            for i, block in enumerate(chunk_upload.blocks):
+                node_id = block.node_id if hasattr(block, 'node_id') else block["node_id"]
+                
+                try:
+                    import base58
+                    if node_id.startswith('12D3'):
+                        decoded = base58.b58decode(node_id)
+                        processed_node_id = decoded[6:]
+                    else:
+                        processed_node_id = node_id.encode() if isinstance(node_id, str) else node_id
+                except ImportError:
+                    processed_node_id = node_id.encode() if isinstance(node_id, str) else node_id
+                
+                node_id_32 = bytearray(32)
+                if len(processed_node_id) >= 32:
+                    node_id_32[:] = processed_node_id[:32]
+                else:
+                    node_id_32[:len(processed_node_id)] = processed_node_id
+                
+                block_cid = block.cid if hasattr(block, 'cid') else block["cid"]
+                block_cid_bytes = self._convert_cid_to_bytes(block_cid)
+                
+                bcid = bytearray(32)
+                if len(block_cid_bytes) > 4:
+                    copy_len = min(len(block_cid_bytes) - 4, 32)
+                    bcid[:copy_len] = block_cid_bytes[4:4+copy_len]
+                else:
+                    copy_len = min(len(block_cid_bytes), 32)
+                    bcid[:copy_len] = block_cid_bytes[:copy_len]
+                
+                import secrets
+                nonce = secrets.randbits(256)
+                
+                chunk_cid = chunk_upload.chunk_cid
+                if hasattr(chunk_cid, 'string'):
+                    chunk_cid_str = chunk_cid.string()
+                elif hasattr(chunk_cid, 'toString'):
+                    chunk_cid_str = chunk_cid.toString()
+                elif not isinstance(chunk_cid, str):
+                    chunk_cid_str = str(chunk_cid)
+                else:
+                    chunk_cid_str = chunk_cid
+                    
+                signature_hex, _ = self._create_storage_signature(
+                    chunk_cid_str, block_cid, chunk_upload.index, i, node_id, nonce, deadline, bucket_id
+                )
+                
+                bucket_id_32 = bytearray(32)
+                if len(bucket_id) >= 32:
+                    bucket_id_32[:] = bucket_id[:32]
+                else:
+                    bucket_id_32[:len(bucket_id)] = bucket_id
+                
+                fill_arg = {
+                    'blockCID': bytes(bcid),
+                    'nodeId': bytes(node_id_32),
+                    'bucketId': bytes(bucket_id_32),
+                    'chunkIndex': chunk_upload.index,
+                    'nonce': nonce,
+                    'blockIndex': i,
+                    'fileName': chunk_upload.file_name,
+                    'signature': bytes.fromhex(signature_hex),
+                    'deadline': deadline
+                }
+                
+                fill_args.append(fill_arg)
+            
+            return fill_args
+            
+        except Exception as e:
+            raise SDKError(f"failed to create FillChunkBlocks arguments: {str(e)}")
+
     def _calculate_file_id(self, bucket_id: bytes, file_name: str) -> bytes:
         try:
             from Crypto.Hash import keccak
@@ -704,7 +1094,7 @@ class IPC:
         except Exception as e:
             raise SDKError(f"Failed to calculate file ID: {str(e)}")
 
-    def _convert_cid_to_bytes(self, cid_input) -> bytes:      
+    def _convert_cid_to_bytes(self, cid_input) -> bytes:
         if hasattr(cid_input, 'bytes'):
             try:
                 if callable(cid_input.bytes):
@@ -713,34 +1103,35 @@ class IPC:
                     return bytes(cid_input.bytes)
             except Exception as e:
                 logging.warning(f"Failed to access .bytes on CID object: {e}")
+        
         elif hasattr(cid_input, '__bytes__'):
             try:
                 return bytes(cid_input)
             except Exception as e:
                 logging.warning(f"Failed to call __bytes__ on CID object: {e}")
-        elif hasattr(cid_input, 'encode') and callable(cid_input.encode):
-            try:
-                result = cid_input.encode()
-                if isinstance(result, bytes):
-                    return result
-                return result.encode() if isinstance(result, str) else bytes(result)
-            except Exception as e:
-                logging.warning(f"Failed to call .encode() on CID object: {e}")
         
         if not isinstance(cid_input, str):
             cid_str = str(cid_input)
         else:
             cid_str = cid_input
-            
+        
         try:
             from multiformats import CID as CIDLib
             cid_obj = CIDLib.decode(cid_str)
-            return self._convert_cid_to_bytes(cid_obj)
-        except Exception as e:
-            logging.warning(f"Failed to decode CID using library: {e}")
             
-            import hashlib
-            return hashlib.sha256(cid_str.encode()).digest()
+            if hasattr(cid_obj, 'bytes'):
+                if callable(cid_obj.bytes):
+                    return cid_obj.bytes()
+                else:
+                    return bytes(cid_obj.bytes)
+            elif hasattr(cid_obj, '__bytes__'):
+                return bytes(cid_obj)
+            else:
+                raise Exception("CID object has no bytes representation")
+                
+        except Exception as e:
+            logging.error(f"Failed to decode CID using multiformats library: {e}")
+            raise SDKError(f"Failed to convert CID to binary format: {e}")
 
     def create_chunk_upload(self, ctx, index: int, file_encryption_key: bytes, data: bytes, bucket_id: bytes, file_name: str) -> IPCFileChunkUploadV2:
         try:
@@ -793,34 +1184,13 @@ class IPC:
                 chunk_dag.blocks[i].node_id = upload.node_id
                 chunk_dag.blocks[i].permit = upload.permit
             
-            chunk_cid_bytes = self._convert_cid_to_bytes(chunk_dag.cid)
-            
-            tx = self.ipc.storage.add_file_chunk(
-                self.ipc.auth.address,      # from_address: HexAddress
-                self.ipc.auth.key,          # private_key: str
-                chunk_cid_bytes,            # cid: bytes (chunk CID) - MUST be bytes (converted from chunk_dag.cid)
-                bucket_id,                  # bucket_id: bytes (bucket ID as bytes32)
-                file_name,                  # name: str (file name)
-                chunk_dag.proto_node_size,  # encoded_chunk_size: int (proto node size maps to encoded_size)
-                cids,                       # cids: list (array of block CIDs as bytes32[])
-                sizes,                      # chunk_blocks_sizes: list (array of block sizes)
-                index,                      # chunk_index: int (chunk index)
-                nonce_manager=None  # nonce_manager for coordinated transactions
-            )
-            
-            if hasattr(self.ipc, 'wait_for_tx') and hasattr(tx, 'hex'):
-                self.ipc.wait_for_tx(tx.hex())
-            elif hasattr(self.ipc, 'web3') and hasattr(self.ipc.eth.eth, 'wait_for_transaction_receipt'):
-                receipt = self.ipc.eth.eth.wait_for_transaction_receipt(tx)
-                if receipt.status != 1:
-                    raise SDKError("AddFileChunk transaction failed")
             
             return IPCFileChunkUploadV2(
                 index=index,
                 chunk_cid=chunk_dag.cid,
                 actual_size=size,
                 raw_data_size=chunk_dag.raw_data_size,
-                encoded_size=chunk_dag.proto_node_size,  # proto_node_size maps to encoded_size
+                encoded_size=chunk_dag.encoded_size,  # proto_node_size maps to encoded_size
                 blocks=chunk_dag.blocks,
                 bucket_id=bucket_id,
                 file_name=file_name
@@ -850,6 +1220,7 @@ class IPC:
                 if err:
                     raise err
                 
+                # Upload all blocks in parallel
                 with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrency) as executor:
                     futures = {}
                     
@@ -863,7 +1234,7 @@ class IPC:
                     
                     for future in concurrent.futures.as_completed(futures):
                         try:
-                            future.result()  # This will raise exception if upload failed
+                            future.result()  
                         except Exception as e:
                             for f in futures:
                                 f.cancel()
@@ -906,50 +1277,63 @@ class IPC:
             
             try:
                 def upload_streaming():
+                    import random
+                    nonce_bytes = random.randbytes(32)
+                    nonce = int.from_bytes(nonce_bytes, byteorder='big')
+                    deadline = int(time.time() + 24 * 60 * 60)
+
+                    try:
+                        import base58
+                        if node_id.startswith('12D3'):
+                            full_node_id = base58.b58decode(node_id)
+                        else:
+                            full_node_id = node_id.encode() if isinstance(node_id, str) else node_id
+                    except ImportError:
+                        full_node_id = node_id.encode() if isinstance(node_id, str) else node_id
+
+                    signature_hex, _ = self._create_storage_signature(
+                        proto_chunk.cid, block_cid, proto_chunk.index,
+                        block_index, node_id, nonce, deadline, bucket_id
+                    )
+
+                    data_len = len(block_data_bytes)
+                    if data_len == 0:
+                        return
+
                     def message_generator():
-                        nonce = secrets.randbits(256) 
-                        
-                        signature_hex, nonce_bytes = self._create_storage_signature(
-                            proto_chunk.cid, block_cid, proto_chunk.index, 
-                            block_index, node_id, nonce
-                        )
-                        
-                        data_len = len(block_data_bytes)
-                        if data_len == 0:
-                            return
-                        
                         i = 0
                         is_first_part = True
-                        
+
                         while i < data_len:
                             end = min(i + self.block_part_size, data_len)
                             segment_data = block_data_bytes[i:end]
-                            
+
                             if isinstance(segment_data, memoryview):
                                 segment_data = bytes(segment_data)
-                            
+
                             block_data = ipcnodeapi_pb2.IPCFileBlockData(
                                 data=segment_data,
-                                cid=block_cid if is_first_part else "",  # Only send CID in first part
+                                cid=block_cid if is_first_part else "",
                                 index=block_index,
-                                chunk=proto_chunk if is_first_part else None,  # Only send chunk in first part
+                                chunk=proto_chunk if is_first_part else None,
                                 bucket_id=bucket_id,
                                 file_name=file_name,
                                 signature=signature_hex,
                                 nonce=nonce_bytes,
-                                node_id=node_id.encode() if isinstance(node_id, str) else node_id
+                                node_id=full_node_id,
+                                deadline=deadline
                             )
-                            
+
                             yield block_data
-                            
                             i = end
-                            is_first_part = False  
+                            is_first_part = False
                     
                     try:
                         response = client.FileUploadBlock(message_generator())
-                        logging.debug(f"Block {block_cid} upload completed successfully")
                         return response
                     except Exception as e:
+                        if "BlockAlreadyFilled" in str(e):
+                            return None 
                         raise SDKError(f"streaming upload failed: {str(e)}")
                 
                 upload_streaming()
@@ -966,7 +1350,7 @@ class IPC:
             raise SDKError(f"failed to upload block {block_cid}: {str(err)}")
     
     def _create_storage_signature(self, chunk_cid: str, block_cid: str, chunk_index: int, 
-                                 block_index: int, node_id: str, nonce: int) -> tuple:
+                                 block_index: int, node_id: str, nonce: int, deadline: int, bucket_id: bytes) -> tuple:
         try:
             from private.eip712 import sign, Domain, TypedData
             nonce_bytes = nonce.to_bytes(32, byteorder='big')
@@ -974,7 +1358,6 @@ class IPC:
             block_cid_obj = CID.decode(block_cid)
             
             chunk_cid_bytes = self._convert_cid_to_bytes(chunk_cid_obj)
-            
             block_cid_bytes = self._convert_cid_to_bytes(block_cid_obj)
             
             bcid = bytearray(32)
@@ -995,8 +1378,8 @@ class IPC:
             except ImportError:
                 node_id_bytes = node_id.encode() if isinstance(node_id, str) else node_id
             
-            chain_id = 78964  
-            contract_address = "0x9Aa8ff1604280d66577ecB5051a3833a983Ca3aF"  
+            chain_id = self.ipc.storage.get_chain_id()
+            contract_address = self.ipc.storage.contract_address
             
             domain = Domain(
                 name="Storage",
@@ -1011,34 +1394,30 @@ class IPC:
                     TypedData("blockCID", "bytes32"), 
                     TypedData("chunkIndex", "uint256"),
                     TypedData("blockIndex", "uint8"),
-                    TypedData("nodeId", "bytes"),
-                    TypedData("nonce", "uint256")
+                    TypedData("nodeId", "bytes32"),
+                    TypedData("nonce", "uint256"),
+                    TypedData("deadline", "uint256"),
+                    TypedData("bucketId", "bytes32")
                 ]
             }
             
             from eth_utils import to_int
             
+            node_id_32 = bytearray(32)
+            if len(node_id_bytes) > 6:
+                copy_len = min(len(node_id_bytes) - 6, 32)
+                node_id_32[:copy_len] = node_id_bytes[6:6+copy_len]
+            
             data_message = {
                 "chunkCID": bytes(chunk_cid_bytes),     
                 "blockCID": bytes(bcid),                
-                "chunkIndex": to_int(chunk_index),  # Ensure int for uint256
-                "blockIndex": int(block_index) & 0xFF,  # Ensure uint8 range
-                "nodeId": bytes(node_id_bytes),       
-                "nonce": to_int(nonce)  # Ensure int for uint256
+                "chunkIndex": to_int(chunk_index),
+                "blockIndex": int(block_index) & 0xFF,
+                "nodeId": bytes(node_id_32),       
+                "nonce": to_int(nonce),
+                "deadline": to_int(deadline),
+                "bucketId": bytes(bucket_id) if len(bucket_id) == 32 else bytes(bucket_id) + b'\x00' * (32 - len(bucket_id))
             }
-            
-            # Debug logging 
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Chunk CID: {chunk_cid}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Block CID: {block_cid}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Chunk Index: {chunk_index}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Block Index: {block_index}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Node ID: {node_id}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Nonce: {nonce}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Chain ID: {chain_id}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Contract Address: {contract_address}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Chunk CID bytes: {chunk_cid_bytes.hex()}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Block CID bytes (bcid): {bytes(bcid).hex()}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Node ID bytes: {node_id_bytes.hex()}")
             
             if isinstance(self.ipc.auth.key, bytes):
                 private_key_bytes = self.ipc.auth.key
@@ -1046,13 +1425,8 @@ class IPC:
                 key_str = str(self.ipc.auth.key).replace('0x', '')
                 private_key_bytes = bytes.fromhex(key_str)
             
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Private key bytes length: {len(private_key_bytes)}")
-            
             signature_bytes = sign(private_key_bytes, domain, data_message, data_types)
             signature_hex = signature_bytes.hex()
-            
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Generated signature: {signature_hex}")
-            print(f"[PYTHON_UPLOAD_SIGNATURE] Signature length: {len(signature_hex)}")
             
             return signature_hex, nonce_bytes
             
@@ -1198,20 +1572,19 @@ class IPC:
             file_name = maybe_encrypt_metadata(file_name, bucket_name + "/" + file_name, self.encryption_key)
             bucket_name = maybe_encrypt_metadata(bucket_name, bucket_name, self.encryption_key)
             
-            try:
-                bucket = self.ipc.storage.get_bucket_by_name(
-                    {"from": self.ipc.auth.address},
-                    bucket_name
-                )
-                if not bucket:
-                    raise SDKError("failed to retrieve bucket")
-            except Exception as e:
-                raise SDKError(f"failed to get bucket: {str(e)}")
+            bucket_info = self.view_bucket(None, bucket_name)
+            if not bucket_info:
+                raise SDKError(f"bucket '{bucket_name}' not found")
+            
+            bucket_id_hex = bucket_info.id
+            if bucket_id_hex.startswith('0x'):
+                bucket_id_hex = bucket_id_hex[2:]
+            bucket_id = bytes.fromhex(bucket_id_hex)
             
             try:
                 file = self.ipc.storage.get_file_by_name(
                     {},
-                    bucket[0],  # bucket ID
+                    bucket_id,  # bucket ID
                     file_name
                 )
                 if not file:

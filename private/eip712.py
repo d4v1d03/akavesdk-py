@@ -112,24 +112,13 @@ def hash_typed_data(domain: Domain, data_message: Dict[str, Any],
         "verifyingContract": domain.verifying_contract,
     }
     
-    print(f"[EIP712] Domain message: {domain_message}")
-    print(f"[EIP712] Data message: {data_message}")
-    
     domain_hash = encode_data("EIP712Domain", domain_message, domain_types)
     data_hash = encode_data("StorageData", data_message, data_types)
-    
-    print(f"[EIP712] Domain hash: {domain_hash.hex()}")
-    print(f"[EIP712] Data hash: {data_hash.hex()}")
-    
     raw_data = bytes([0x19, 0x01]) + domain_hash + data_hash
-    
-    print(f"[EIP712] Raw data for signing: {raw_data.hex()}")
     
     hash_obj = keccak.new(digest_bits=256)
     hash_obj.update(raw_data)
     final_hash = hash_obj.digest()
-    
-    print(f"[EIP712] Final hash: {final_hash.hex()}")
     
     return final_hash
 

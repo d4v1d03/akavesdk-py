@@ -34,9 +34,11 @@ dist/
 # macOS files
 .DS_Store
 NOTES
-*.toml
 scripts/
 *.lock
+
+# Allow specific config files
+!pyproject.toml
 # Windows files
 Thumbs.db
 ehthumbs.db

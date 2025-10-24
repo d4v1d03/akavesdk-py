@@ -95,61 +95,96 @@ The IPC API is the recommended approach for interacting with Akave's decentraliz
 
 ```python
 import os
+import time
 from akavesdk import SDK, SDKConfig, SDKError
 
-# Initialize the SDK with a private key
-config  = SDKConfig(
-    address="connect.akave.ai:5500",
-    max_concurrency=10,
-    block_part_size=1 * 1024 * 1024,  # 1MB
-    use_connection_pool=True,
+# Initialize the SDK with IPC configuration
+config = SDKConfig(
+    address="connect.akave.ai:5500",  # IPC node endpoint
     private_key=os.environ.get("AKAVE_PRIVATE_KEY"),  # Required for IPC operations
-    connection_timeout=30 # 30 seconds (optional)
+    max_concurrency=5,
+    block_part_size=128 * 1024,  # 128KB
+    use_connection_pool=True,
+    chunk_buffer=10,
+    connection_timeout=30  # 30 seconds (optional)
 )
 
 sdk = SDK(config)
 
 try:
-    # Get IPC API interface
+    # Step 1: Get IPC API interface
     ipc = sdk.ipc()
+    print("✅ IPC instance created")
     
-    # Create a bucket
-    bucket_result = ipc.create_bucket({}, "my-bucket")
-    print(f"Created bucket: {bucket_result.name}")
+    # Step 2: Check if bucket exists, create if it doesn't
+    bucket_name = "my-bucket"
+    existing_bucket = ipc.view_bucket(None, bucket_name)
     
-    # List buckets
-    buckets = ipc.list_buckets({})
+    if existing_bucket is None:
+        print(f"Creating bucket '{bucket_name}'...")
+        bucket_result = ipc.create_bucket(None, bucket_name)
+        print(f"✅ Bucket created: {bucket_result.name} (ID: {bucket_result.id})")
+        time.sleep(2)  # Wait for blockchain confirmation
+    else:
+        print(f"✅ Bucket already exists: {existing_bucket.name}")
+    
+    # Step 3: List buckets
+    # list_buckets(ctx, offset=0, limit=0) - limit=0 returns all buckets
+    buckets = ipc.list_buckets(None, offset=0, limit=0)
+    print(f"Found {len(buckets)} bucket(s):")
     for bucket in buckets:
-        print(f"Bucket: {bucket.name}, Created: {bucket.created_at}")
+        print(f"  - {bucket.name} (Created: {bucket.created_at})")
     
-    # Upload a file (minimum file size is 127 bytes, max recommended test size: 100MB)
-    with open("my-file.txt", "rb") as f:
-        ipc.create_file_upload({}, "my-bucket", "my-file.txt")
-        file_meta = ipc.upload({}, "my-bucket", "my-file.txt", f)
-        print(f"Uploaded file: {file_meta.name}, Size: {file_meta.encoded_size} bytes")
+    # You can also use pagination:
+    # first_10 = ipc.list_buckets(None, offset=0, limit=10)  # First 10 buckets
+    # next_10 = ipc.list_buckets(None, offset=10, limit=10)  # Next 10 buckets
     
-    # Download a file
+    # Step 4: Upload a file (minimum file size is 127 bytes, max recommended test size: 100MB)
+    # Note: upload() handles file creation and all transactions automatically
+    file_name = "my-file.txt"
+    with open(file_name, "rb") as f:
+        file_meta = ipc.upload(None, bucket_name, file_name, f)
+        print(f"✅ Uploaded file: {file_meta.name}")
+        print(f"   Root CID: {file_meta.root_cid}")
+        print(f"   Size: {file_meta.size} bytes")
+        print(f"   Encoded Size: {file_meta.encoded_size} bytes")
+    
+    # Step 5: Verify file upload
+    retrieved_meta = ipc.file_info(None, bucket_name, file_name)
+    if retrieved_meta:
+        print(f"✅ File metadata verified:")
+        print(f"   Name: {retrieved_meta.name}")
+        print(f"   Bucket: {retrieved_meta.bucket_name}")
+        print(f"   Root CID: {retrieved_meta.root_cid}")
+    
+    # Step 6: List files in bucket
+    files = ipc.list_files(None, bucket_name)
+    print(f"✅ Found {len(files)} file(s) in bucket '{bucket_name}':")
+    for file in files:
+        print(f"  - {file.name} (Size: {file.encoded_size} bytes)")
+    
+    # Step 7: Download a file
     with open("downloaded-file.txt", "wb") as f:
-        download = ipc.create_file_download({}, "my-bucket", "my-file.txt")
-        ipc.download({}, download, f)
-        print(f"Downloaded file with {len(download.chunks)} chunks")
+        download = ipc.create_file_download(None, bucket_name, file_name)
+        ipc.download(None, download, f)
+        print(f"✅ Downloaded file with {len(download.chunks)} chunks")
     
-    # Delete a file
-    ipc.file_delete({}, "my-bucket", "my-file.txt")
-    print("File deleted successfully")
+    # Step 8: Delete a file
+    ipc.file_delete(None, bucket_name, file_name)
+    print("✅ File deleted successfully")
     
-    # Delete a bucket
-    ipc.delete_bucket({}, "my-bucket")
-    print("Bucket deleted successfully")
+    # Step 9: Delete a bucket
+    ipc.delete_bucket(None, bucket_name)
+    print("✅ Bucket deleted successfully")
+    
 except SDKError as e:
-    # handle sdk exception
-    pass
+    print(f"❌ SDK Error: {e}")
 except Exception as e:
-    # handle generic exception
-    pass
+    print(f"❌ Error: {type(e).__name__}: {str(e)}")
 finally:
     # Always close the connection when done
     sdk.close()
+    print("Connection closed")
 ```
 
 ### Streaming API Usage

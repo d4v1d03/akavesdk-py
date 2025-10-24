@@ -209,13 +209,18 @@ class IPC:
             logging.error(f"IPC view_bucket unexpected error: {err}")
             raise SDKError(f"failed to view bucket: {err}")
 
-    def list_buckets(self, ctx) -> list[IPCBucket]:
+    def list_buckets(self, ctx, offset: int = 0, limit: int = 0) -> list[IPCBucket]:    
         try:
+            actual_limit = limit if limit > 0 else 10000
+            
             request = ipcnodeapi_pb2.IPCBucketListRequest(
-                address=self.ipc.auth.address.lower()
+                address=self.ipc.auth.address, 
+                offset=offset,
+                limit=actual_limit
             )
-            logging.info(f"Sending BucketList request with address: {self.ipc.auth.address.lower()}")
+            logging.info(f"Sending BucketList request - address: {self.ipc.auth.address}, offset: {offset}, limit: {actual_limit} (user limit: {limit})")
             response = self.client.BucketList(request)
+            
             buckets = []
             if response and hasattr(response, 'buckets'):
                 logging.info(f"Received BucketList response with {len(response.buckets)} buckets")
@@ -225,15 +230,14 @@ class IPC:
                         created_at = int(bucket.created_at.seconds)
                     
                     bucket_name = bucket.name if hasattr(bucket, 'name') else ''
-                    bucket_id = bucket.id if hasattr(bucket, 'id') else ''
-                    logging.info(f"Processing bucket: name={bucket_name}, id={bucket_id}, created_at={created_at}")
                     buckets.append(IPCBucket(
                         name=bucket_name,
                         created_at=created_at,
-                        id=bucket_id
+                        id=''  
                     ))
             else:
-                logging.warning("BucketList response has no 'buckets' field or is empty")
+                logging.info("BucketList response is empty or has no 'buckets' field")
+            
             return buckets
         except grpc.RpcError as e:
             logging.error(f"IPC list_buckets gRPC failed: {e.code()} - {e.details()}")

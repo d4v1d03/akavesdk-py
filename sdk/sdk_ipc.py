@@ -201,12 +201,17 @@ class IPC:
             )
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.NOT_FOUND:
+                logging.info(f"Bucket '{bucket_name}' not found")
                 return None
             logging.error(f"IPC view_bucket gRPC failed: {e.code()} - {e.details()}")
-            raise SDKError(f"failed to view bucket: {e.details()}")
+            raise SDKError(f"bucket not found")
         except Exception as err:
+            error_str = str(err).lower()
+            if "not found" in error_str:
+                logging.info(f"Bucket '{bucket_name}' not found")
+                return None
             logging.error(f"IPC view_bucket unexpected error: {err}")
-            raise SDKError(f"failed to view bucket: {err}")
+            raise SDKError(f"failed to get bucket: {err}")
 
     def list_buckets(self, ctx, offset: int = 0, limit: int = 0) -> list[IPCBucket]:    
         try:
@@ -510,6 +515,19 @@ class IPC:
                     break
                 except Exception as e:
                     error_msg = str(e).lower()
+                    
+                    if "0x6891dde0" in error_msg or "filealreadyexists" in error_msg:
+                        logging.info(f"File '{file_name}' already exists in bucket '{bucket_name}'")
+                        raise SDKError(f"file already exists")
+                    
+                    if "transaction reverted" in error_msg:
+                        from private.ipc.errors import error_hash_to_error
+                        parsed_error = error_hash_to_error(e)
+                        error_name = str(parsed_error)
+                        if error_name != str(e):
+                            logging.error(f"Transaction reverted: {error_name}")
+                            raise SDKError(f"upload failed: {error_name}")
+                    
                     is_retryable = any(retry_phrase in error_msg for retry_phrase in [
                         "nonce too low", "replacement transaction underpriced", "eof"
                     ])

@@ -203,8 +203,12 @@ class IPC:
             if e.code() == grpc.StatusCode.NOT_FOUND:
                 logging.info(f"Bucket '{bucket_name}' not found")
                 return None
+            error_details = str(e.details()).lower() if e.details() else ""
+            if "not found" in error_details:
+                logging.info(f"Bucket '{bucket_name}' not found")
+                return None
             logging.error(f"IPC view_bucket gRPC failed: {e.code()} - {e.details()}")
-            raise SDKError(f"bucket not found")
+            raise SDKError(f"failed to view bucket: {e.details()}")
         except Exception as err:
             error_str = str(err).lower()
             if "not found" in error_str:

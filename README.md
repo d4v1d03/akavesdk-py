@@ -179,10 +179,6 @@ try:
     ipc.file_delete(None, bucket_name, file_name)
     print("✅ File deleted successfully")
     
-    # Step 9: Delete a bucket
-    ipc.delete_bucket(None, bucket_name)
-    print("✅ Bucket deleted successfully")
-    
 except SDKError as e:
     print(f"❌ SDK Error: {e}")
 except Exception as e:

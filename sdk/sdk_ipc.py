@@ -14,7 +14,6 @@ from datetime import datetime
 import grpc 
 
 from .config import MIN_BUCKET_NAME_LENGTH, SDKError, SDKConfig, BLOCK_SIZE, ENCRYPTION_OVERHEAD
-from .erasure_code import ErasureCode
 from .dag import DAGRoot, build_dag, extract_block_data
 from .connection import ConnectionPool
 from .model import (
@@ -140,7 +139,6 @@ class IPC:
         self.use_connection_pool = config.use_connection_pool
         self.encryption_key = config.encryption_key if config.encryption_key else b''
         self.max_blocks_in_chunk = config.streaming_max_blocks_in_chunk
-        self.erasure_code = config.erasure_code
         self.chunk_buffer = config.chunk_buffer
         
         from .sdk import WithRetry
@@ -595,8 +593,6 @@ class IPC:
                 chunk_enc_overhead = EncryptionOverhead
 
             buffer_size = self.max_blocks_in_chunk * int(BlockSize)
-            if self.erasure_code:
-                buffer_size = self.erasure_code.data_blocks * int(BlockSize)
             buffer_size -= chunk_enc_overhead
 
             if is_continuation:
@@ -788,10 +784,6 @@ class IPC:
             size = len(data)
             
             block_size = BlockSize
-            if self.erasure_code:
-                data = self.erasure_code.encode(data)
-                blocks_count = self.erasure_code.data_blocks + self.erasure_code.parity_blocks
-                block_size = len(data) // blocks_count
             
             chunk_dag = build_dag(ctx, io.BytesIO(data), block_size, None)
             if chunk_dag is None:
@@ -1359,10 +1351,7 @@ class IPC:
                         except Exception as e:
                             raise SDKError(f"failed to download block: {str(e)}")
                 
-                if self.erasure_code:
-                    data = self.erasure_code.extract_data_blocks(blocks, int(chunk_download.size))
-                else:
-                    data = b"".join([b for b in blocks if b is not None])
+                data = b"".join([b for b in blocks if b is not None])
                 
                 if file_encryption_key:
                     from private.encryption import decrypt

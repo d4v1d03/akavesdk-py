@@ -9,10 +9,7 @@ from datetime import datetime
 from typing import Optional, Callable, TypeVar, List, Dict, Any
 from private.pb import nodeapi_pb2, nodeapi_pb2_grpc, ipcnodeapi_pb2, ipcnodeapi_pb2_grpc
 from private.ipc.client import Client
-from private.spclient.spclient import SPClient
 from .sdk_ipc import IPC
-from .sdk_streaming import StreamingAPI
-from .erasure_code import ErasureCode
 from .config import Config, SDKConfig, SDKError, BLOCK_SIZE, MIN_BUCKET_NAME_LENGTH
 from private.encryption import derive_key
 from .shared.grpc_base import GrpcClientBase
@@ -174,8 +171,6 @@ class SDK():
         self.conn = None
         self.ipc_conn = None
         self.ipc_client = None
-        self.sp_client = None
-        self.streaming_erasure_code = None
         self.config = config
         self._grpc_base = GrpcClientBase(self.config.connection_timeout)
 
@@ -198,14 +193,6 @@ class SDK():
 
         if len(self.config.encryption_key) != 0 and len(self.config.encryption_key) != 32:
             raise SDKError("Encryption key length should be 32 bytes long")
-
-        if self.config.parity_blocks_count > self.config.streaming_max_blocks_in_chunk // 2:
-            raise SDKError(f"Parity blocks count {self.config.parity_blocks_count} should be <= {self.config.streaming_max_blocks_in_chunk // 2}")
-
-        if self.config.parity_blocks_count > 0:
-            self.streaming_erasure_code = ErasureCode(self.config.streaming_max_blocks_in_chunk - self.config.parity_blocks_count, self.config.parity_blocks_count)
-
-        self.sp_client = SPClient()
 
     def _fetch_contract_info(self) -> Optional[dict]:
         """Dynamically fetch contract information using multiple endpoints"""
@@ -246,14 +233,6 @@ class SDK():
             self.conn.close()
         if self.ipc_conn and self.ipc_conn != self.conn:
             self.ipc_conn.close()
-
-    def streaming_api(self):
-        """Returns SDK streaming API."""
-        return StreamingAPI(
-            conn=self.conn,
-            client=nodeapi_pb2_grpc.StreamAPIStub(self.conn),
-            config=self.config
-        )
 
     def ipc(self):
         """Returns SDK IPC API."""

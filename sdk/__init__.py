@@ -220,10 +220,6 @@ try:
 except ImportError:
     IPC = None
 
-try:
-    from .sdk_streaming import StreamingAPI
-except ImportError:
-    StreamingAPI = None
 
 __all__ = [
     # Core SDK
@@ -265,7 +261,6 @@ __all__ = [
     
     # APIs
     'IPC',
-    'StreamingAPI',
     
     # Model classes
     'IPCFileUpload',

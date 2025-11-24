@@ -1,7 +1,6 @@
 from typing import Optional, List
 from private.memory.memory import Size
 from dataclasses import dataclass
-from .erasure_code import ErasureCode
 
 BLOCK_SIZE = 1 * Size.MB
 ENCRYPTION_OVERHEAD = 28  # 16 bytes for AES-GCM tag, 12 bytes for nonce
@@ -104,4 +103,3 @@ class SDKConfig:
     max_retries: Optional[int] = 3
     backoff_delay: Optional[int] = 1
     ipc_address: Optional[str] = None
-    erasure_code: Optional[ErasureCode] = None

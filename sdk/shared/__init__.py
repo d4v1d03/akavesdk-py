@@ -1,4 +1,4 @@
-"""Shared utilities for the Akave Python SDK."""
+# Shared utilities for SDK
 
 from .grpc_base import GrpcClientBase
 from .httpext import (

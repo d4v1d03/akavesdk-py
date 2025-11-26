@@ -18,7 +18,6 @@ class TestHTTPClientInit:
         client = HTTPClient()
 
         assert client.base_url is None
-        # Access to internal client is acceptable in tests (see other unit tests).
         assert isinstance(client._client, httpx.Client)  # type: ignore[attr-defined]
 
     def test_http_client_initialization_with_base_url_and_timeout(self):
@@ -52,17 +51,14 @@ class TestHTTPClientBuildUrl:
 class TestHTTPClientContextManager:
     @patch("httpx.Client.request")
     def test_context_manager_closes_client(self, mock_request):
-        # Prepare a dummy successful response
         request = httpx.Request("GET", "https://api.example.com/v1/health")
         mock_request.return_value = httpx.Response(200, request=request)
 
         with HTTPClient(base_url="https://api.example.com") as client:
             resp = client.get("/v1/health")
             assert resp.status_code == 200
-            # Client should not be closed inside the context
             assert client._client.is_closed is False  # type: ignore[attr-defined]
-
-        # After context exit, client must be closed
+        # closed after context exit
         assert client._client.is_closed is True  # type: ignore[attr-defined]
 
 

@@ -34,35 +34,7 @@ def retry_on_http_error(
     base_delay: float = 0.5,
     retry_exceptions: Iterable[Type[BaseException]] = (httpx.RequestError, SDKError),
 ) -> Callable[..., R]:
-    """Retry a function on HTTP-related errors using exponential backoff.
-
-    This decorator is primarily intended for methods of :class:`HTTPClient`, but it
-    can be applied to any callable that may raise ``httpx.RequestError`` or
-    :class:`SDKError`.
-
-    By default it retries up to ``max_attempts`` times, waiting an exponentially
-    increasing delay between attempts (``base_delay * 2**(attempt-1)``).
-
-    Args:
-        fn: Function to decorate. When using ``@retry_on_http_error`` without
-            arguments, this is provided automatically by the decorator machinery.
-        max_attempts: Maximum number of attempts before giving up.
-        base_delay: Initial delay (in seconds) for the exponential backoff.
-        retry_exceptions: Iterable of exception classes that should trigger a retry.
-
-    Returns:
-        A wrapped callable that will retry on the configured exception types.
-
-    Example:
-        >>> from sdk.shared.httpext import retry_on_http_error
-        >>> import httpx
-        >>>
-        >>> @retry_on_http_error
-        ... def fetch_data(url: str) -> str:
-        ...     response = httpx.get(url, timeout=5.0)
-        ...     response.raise_for_status()
-        ...     return response.text
-    """
+    """Retry a callable on HTTP-related errors using exponential backoff."""
 
     def decorator(func: Callable[..., R]) -> Callable[..., R]:
         @wraps(func)
@@ -114,36 +86,7 @@ def retry_on_http_error(
 
 
 class HTTPClient:
-    """HTTP client with connection pooling, retries and SDK-style error handling.
-
-    ``HTTPClient`` wraps :class:`httpx.Client` to provide:
-
-    * Connection pooling via a long-lived client instance.
-    * Retry logic using :func:`retry_on_http_error`.
-    * Consistent error handling via :class:`HTTPClientError` (a subclass of
-      :class:`SDKError`).
-
-    Args:
-        base_url: Optional base URL. When provided, relative paths passed to the
-            request methods are resolved against this base.
-        timeout: Default request timeout in seconds. Can be overridden per call.
-        max_retries: Maximum number of attempts for retried operations.
-
-    Example:
-        Basic usage:
-
-        >>> from sdk.shared.httpext import HTTPClient
-        >>> client = HTTPClient(base_url="https://api.example.com")
-        >>> response = client.get("/health")
-        >>> data = response.json()
-
-        Using as a context manager:
-
-        >>> from sdk.shared.httpext import HTTPClient
-        >>> with HTTPClient(base_url="https://api.example.com") as client:
-        ...     response = client.post("/items", json={"name": "example"})
-        ...     item = response.json()
-    """
+    """Small HTTP client wrapper with pooling, retries and SDK-style errors."""
 
     def __init__(
         self,

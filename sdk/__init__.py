@@ -220,6 +220,15 @@ try:
 except ImportError:
     IPC = None
 
+try:
+    from private.cids import verify_raw, verify, CIDError
+except ImportError:
+    def verify_raw(*args, **kwargs):
+        raise ImportError("CID utilities not available due to missing dependencies")
+    def verify(*args, **kwargs):
+        raise ImportError("CID utilities not available due to missing dependencies")
+    CIDError = Exception
+
 
 __all__ = [
     # Core SDK
@@ -261,6 +270,11 @@ __all__ = [
     
     # APIs
     'IPC',
+    
+    # CID utilities
+    'verify_raw',
+    'verify',
+    'CIDError',
     
     # Model classes
     'IPCFileUpload',

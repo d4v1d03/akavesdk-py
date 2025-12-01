@@ -212,14 +212,14 @@ class TestClient:
         
         # Create test data
         data = StorageData(
-            chunkCID=b"test_chunk",
-            blockCID=b"0" * 32,
-            chunkIndex=0,
-            blockIndex=1,
-            nodeId=b"1" * 32,
+            chunk_cid=b"test_chunk",
+            block_cid=b"0" * 32,
+            chunk_index=0,
+            block_index=1,
+            node_id=b"1" * 32,
             nonce=12345,
             deadline=int(time.time()) + 3600,
-            bucketId=b"2" * 32
+            bucket_id=b"2" * 32
         )
         
         # Test signing

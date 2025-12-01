@@ -96,4 +96,4 @@ def sign_block(private_key_hex: str, storage_address: str, chain_id: int, data: 
 
     message = data.to_message_dict()
 
-    return eip712_sign(private_key_bytes, domain, message, storage_data_types)
+    return eip712_sign(private_key_bytes, domain, "StorageData", storage_data_types, message)

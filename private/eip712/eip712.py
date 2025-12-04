@@ -23,34 +23,20 @@ class Domain:
         self.verifying_contract = verifying_contract
 
 
-def sign(private_key_bytes: bytes, domain: Domain, data_message: Dict[str, Any], 
-         data_types: Dict[str, List[TypedData]]) -> bytes:
+def sign(private_key_bytes: bytes, domain: Domain, primary_type: str, 
+         data_types: Dict[str, List[TypedData]], data_message: Dict[str, Any]) -> bytes:
     """Sign EIP-712 data according to the standard - properly hash bytes fields"""
     try:
-        from eth_utils import keccak as eth_keccak
-        fixed_data_message = data_message.copy() 
+        # Clone data_types and add EIP712Domain
+        data_types_copy = data_types.copy()
+        data_types_copy["EIP712Domain"] = [
+            TypedData("name", "string"),
+            TypedData("version", "string"),
+            TypedData("chainId", "uint256"),
+            TypedData("verifyingContract", "address"),
+        ]
         
-        types_dict = {
-            "EIP712Domain": [
-                {"name": "name", "type": "string"},
-                {"name": "version", "type": "string"}, 
-                {"name": "chainId", "type": "uint256"},
-                {"name": "verifyingContract", "type": "address"}
-            ],
-            "StorageData": [
-                {"name": field.name, "type": field.type} 
-                for field in data_types["StorageData"]
-            ]
-        }
-        
-        domain_dict = {
-            "name": domain.name,
-            "version": domain.version,
-            "chainId": domain.chain_id,
-            "verifyingContract": domain.verifying_contract
-        }
-        
-        typed_data_hash = hash_typed_data(domain, fixed_data_message, data_types)
+        typed_data_hash = hash_typed_data(domain, primary_type, data_message, data_types_copy)
         
         class EncodedMessage:
             def __init__(self, body):
@@ -93,17 +79,8 @@ def type_hash(primary_type: str, types: Dict[str, List[TypedData]]) -> bytes:
     return hash_obj.digest()
 
 
-def hash_typed_data(domain: Domain, data_message: Dict[str, Any], 
+def hash_typed_data(domain: Domain, primary_type: str, data_message: Dict[str, Any], 
                    data_types: Dict[str, List[TypedData]]) -> bytes:
-    
-    domain_types = {
-        "EIP712Domain": [
-            TypedData("name", "string"),
-            TypedData("version", "string"),
-            TypedData("chainId", "uint256"),
-            TypedData("verifyingContract", "address"),
-        ]
-    }
     
     domain_message = {
         "name": domain.name,
@@ -112,8 +89,8 @@ def hash_typed_data(domain: Domain, data_message: Dict[str, Any],
         "verifyingContract": domain.verifying_contract,
     }
     
-    domain_hash = encode_data("EIP712Domain", domain_message, domain_types)
-    data_hash = encode_data("StorageData", data_message, data_types)
+    domain_hash = encode_data("EIP712Domain", domain_message, data_types)
+    data_hash = encode_data(primary_type, data_message, data_types)
     raw_data = bytes([0x19, 0x01]) + domain_hash + data_hash
     
     hash_obj = keccak.new(digest_bits=256)
@@ -217,10 +194,19 @@ def encode_value(value: Any, type_name: str) -> bytes:
         raise ValueError(f"unsupported type: {type_name}")
 
 
-def recover_signer_address(signature: bytes, domain: Domain, data_message: Dict[str, Any], 
-                          data_types: Dict[str, List[TypedData]]) -> str:
+def recover_signer_address(signature: bytes, domain: Domain, primary_type: str,
+                          data_types: Dict[str, List[TypedData]], data_message: Dict[str, Any]) -> str:
     
-    hash_bytes = hash_typed_data(domain, data_message, data_types)
+    # Clone data_types and add EIP712Domain
+    data_types_copy = data_types.copy()
+    data_types_copy["EIP712Domain"] = [
+        TypedData("name", "string"),
+        TypedData("version", "string"),
+        TypedData("chainId", "uint256"),
+        TypedData("verifyingContract", "address"),
+    ]
+    
+    hash_bytes = hash_typed_data(domain, primary_type, data_message, data_types_copy)
     
     sig_copy = bytearray(signature)
     if sig_copy[64] >= 27:

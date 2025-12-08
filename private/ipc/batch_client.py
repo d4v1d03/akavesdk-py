@@ -10,6 +10,8 @@ from web3 import Web3
 from web3.exceptions import BlockNotFound, TransactionNotFound
 from eth_typing import HexStr
 
+from .block_parser import block_from_json
+
 
 @dataclass
 class BatchReceiptRequest:
@@ -142,7 +144,8 @@ class BatchClient:
                     )
                 else:
                     try:
-                        block_data = self._block_from_json(raw_response['result'])
+                        block_json = json.dumps(raw_response['result']).encode('utf-8')
+                        block_data = block_from_json(block_json)
                         response = BatchBlockResponse(
                             block_number=block_number,
                             block=block_data,
@@ -163,7 +166,8 @@ class BatchClient:
             for block_number in block_numbers:
                 try:
                     block = self.web3.eth.get_block(block_number, full_transactions=True)
-                    block_data = self._block_from_json(dict(block))
+                    block_json = json.dumps(dict(block)).encode('utf-8')
+                    block_data = block_from_json(block_json)
                     response = BatchBlockResponse(
                         block_number=block_number,
                         block=block_data,
@@ -184,21 +188,3 @@ class BatchClient:
                 responses.append(response)
             
             return responses
-
-    def _block_from_json(self, block_json: Dict[str, Any]) -> Dict[str, Any]:
-        if isinstance(block_json.get('number'), str):
-            block_json['number'] = int(block_json['number'], 16)
-        if isinstance(block_json.get('timestamp'), str):
-            block_json['timestamp'] = int(block_json['timestamp'], 16)
-        if isinstance(block_json.get('gasLimit'), str):
-            block_json['gasLimit'] = int(block_json['gasLimit'], 16)
-        if isinstance(block_json.get('gasUsed'), str):
-            block_json['gasUsed'] = int(block_json['gasUsed'], 16)
-        if isinstance(block_json.get('size'), str):
-            block_json['size'] = int(block_json['size'], 16)
-        if isinstance(block_json.get('difficulty'), str):
-            block_json['difficulty'] = int(block_json['difficulty'], 16)
-        if isinstance(block_json.get('totalDifficulty'), str):
-            block_json['totalDifficulty'] = int(block_json['totalDifficulty'], 16)
-        
-        return block_json

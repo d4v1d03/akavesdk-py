@@ -118,12 +118,18 @@ def deposit(
 def to_wei(amount: Union[int, float]) -> int:
     return int(amount * 10**18)
 
+
+def private_key_to_hex(private_key: LocalAccount) -> str:
+    pk_bytes = private_key.key
+    return pk_bytes.hex()
+
+
 def wait_for_tx(
     web3: Web3,
     tx_hash: Union[str, bytes],
     timeout: float = 120.0,
     poll_interval: float = 0.2
-) -> None:
+):
     
     if isinstance(tx_hash, str):
         if tx_hash.startswith('0x'):
@@ -135,8 +141,8 @@ def wait_for_tx(
     
     try:
         receipt = web3.eth.get_transaction_receipt(tx_hash)
-        if receipt.status == 1:
-            return
+        if receipt['status'] == 1:
+            return receipt
         else:
             raise IPCTestError("Transaction failed")
     except TransactionNotFound:
@@ -151,8 +157,8 @@ def wait_for_tx(
         
         try:
             receipt = web3.eth.get_transaction_receipt(tx_hash)
-            if receipt.status == 1:
-                return
+            if receipt['status'] == 1:
+                return receipt
             else:
                 raise IPCTestError("Transaction failed")
         except TransactionNotFound:

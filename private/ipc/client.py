@@ -1,7 +1,7 @@
 import time
 import threading
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any, Union, NamedTuple
+from typing import Optional, List, Dict, Any, Union
 from web3 import Web3
 from web3.middleware.proof_of_authority import ExtraDataToPOAMiddleware
 from web3.exceptions import TransactionNotFound
@@ -28,22 +28,6 @@ class ContractsAddresses:
     storage: str = ""
     access_manager: str = ""
     policy_factory: str = ""
-
-
-class BatchReceiptRequest(NamedTuple):
-    hash: str
-    key: str
-
-
-class BatchReceiptResponse(NamedTuple):
-    receipt: Optional[dict]
-    error: Optional[Exception]
-    key: str
-
-
-@dataclass
-class BatchReceiptResult:
-    responses: List[BatchReceiptResponse]
 
 
 class TransactionFailedError(Exception):
@@ -259,40 +243,6 @@ class Client:
         
         from .contracts import ListPolicyContract
         return ListPolicyContract(self.eth, policy_instance_address)
-
-    def get_transaction_receipts_batch(self, requests: List[BatchReceiptRequest], 
-                                     timeout: float = 30.0) -> BatchReceiptResult:
-        try:
-            batch_requests = []
-            for req in requests:
-                batch_requests.append(('eth_getTransactionReceipt', [req.hash]))
-            
-            raw_responses = self.eth.manager.request_blocking_batch(batch_requests)
-            
-            responses = []
-            for i, (req, raw_response) in enumerate(zip(requests, raw_responses)):
-                response = BatchReceiptResponse(
-                    receipt=raw_response.get('result') if raw_response.get('result') else None,
-                    error=Exception(raw_response.get('error', {}).get('message', 'Unknown error')) if 'error' in raw_response else None,
-                    key=req.key
-                )
-                responses.append(response)
-            
-            return BatchReceiptResult(responses=responses)
-            
-        except Exception as e:
-            responses = []
-            for req in requests:
-                try:
-                    receipt = self.eth.eth.get_transaction_receipt(req.hash)
-                    response = BatchReceiptResponse(receipt=dict(receipt), error=None, key=req.key)
-                except TransactionNotFound:
-                    response = BatchReceiptResponse(receipt=None, error=None, key=req.key)
-                except Exception as err:
-                    response = BatchReceiptResponse(receipt=None, error=err, key=req.key)
-                responses.append(response)
-            
-            return BatchReceiptResult(responses=responses)
 
     def wait_for_tx(self, tx_hash: Union[str, bytes], timeout: float = 120.0) -> dict:
         if isinstance(tx_hash, bytes):

@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from private.pb import nodeapi_pb2 as private_dot_pb_dot_nodeapi__pb2
+import nodeapi_pb2 as nodeapi__pb2
 
 GRPC_GENERATED_VERSION = '1.71.2'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in private/pb/nodeapi_pb2_grpc.py depends on'
+        + f' but the generated code in nodeapi_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,23 +36,23 @@ class NodeAPIStub(object):
         """
         self.BucketCreate = channel.unary_unary(
                 '/nodeapi.NodeAPI/BucketCreate',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.BucketCreateRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.BucketCreateResponse.FromString,
+                request_serializer=nodeapi__pb2.BucketCreateRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.BucketCreateResponse.FromString,
                 _registered_method=True)
         self.BucketView = channel.unary_unary(
                 '/nodeapi.NodeAPI/BucketView',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.BucketViewRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.BucketViewResponse.FromString,
+                request_serializer=nodeapi__pb2.BucketViewRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.BucketViewResponse.FromString,
                 _registered_method=True)
         self.BucketList = channel.unary_unary(
                 '/nodeapi.NodeAPI/BucketList',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.BucketListRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.BucketListResponse.FromString,
+                request_serializer=nodeapi__pb2.BucketListRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.BucketListResponse.FromString,
                 _registered_method=True)
         self.BucketDelete = channel.unary_unary(
                 '/nodeapi.NodeAPI/BucketDelete',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.BucketDeleteRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.BucketDeleteResponse.FromString,
+                request_serializer=nodeapi__pb2.BucketDeleteRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.BucketDeleteResponse.FromString,
                 _registered_method=True)
 
 
@@ -89,23 +89,23 @@ def add_NodeAPIServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'BucketCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.BucketCreate,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.BucketCreateRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.BucketCreateResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.BucketCreateRequest.FromString,
+                    response_serializer=nodeapi__pb2.BucketCreateResponse.SerializeToString,
             ),
             'BucketView': grpc.unary_unary_rpc_method_handler(
                     servicer.BucketView,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.BucketViewRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.BucketViewResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.BucketViewRequest.FromString,
+                    response_serializer=nodeapi__pb2.BucketViewResponse.SerializeToString,
             ),
             'BucketList': grpc.unary_unary_rpc_method_handler(
                     servicer.BucketList,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.BucketListRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.BucketListResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.BucketListRequest.FromString,
+                    response_serializer=nodeapi__pb2.BucketListResponse.SerializeToString,
             ),
             'BucketDelete': grpc.unary_unary_rpc_method_handler(
                     servicer.BucketDelete,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.BucketDeleteRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.BucketDeleteResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.BucketDeleteRequest.FromString,
+                    response_serializer=nodeapi__pb2.BucketDeleteResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -133,8 +133,8 @@ class NodeAPI(object):
             request,
             target,
             '/nodeapi.NodeAPI/BucketCreate',
-            private_dot_pb_dot_nodeapi__pb2.BucketCreateRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.BucketCreateResponse.FromString,
+            nodeapi__pb2.BucketCreateRequest.SerializeToString,
+            nodeapi__pb2.BucketCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -160,8 +160,8 @@ class NodeAPI(object):
             request,
             target,
             '/nodeapi.NodeAPI/BucketView',
-            private_dot_pb_dot_nodeapi__pb2.BucketViewRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.BucketViewResponse.FromString,
+            nodeapi__pb2.BucketViewRequest.SerializeToString,
+            nodeapi__pb2.BucketViewResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -187,8 +187,8 @@ class NodeAPI(object):
             request,
             target,
             '/nodeapi.NodeAPI/BucketList',
-            private_dot_pb_dot_nodeapi__pb2.BucketListRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.BucketListResponse.FromString,
+            nodeapi__pb2.BucketListRequest.SerializeToString,
+            nodeapi__pb2.BucketListResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -214,8 +214,8 @@ class NodeAPI(object):
             request,
             target,
             '/nodeapi.NodeAPI/BucketDelete',
-            private_dot_pb_dot_nodeapi__pb2.BucketDeleteRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.BucketDeleteResponse.FromString,
+            nodeapi__pb2.BucketDeleteRequest.SerializeToString,
+            nodeapi__pb2.BucketDeleteResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -239,68 +239,73 @@ class StreamAPIStub(object):
         """
         self.FileUploadCreate = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileUploadCreate',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCreateRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCreateResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileUploadCreateRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileUploadCreateResponse.FromString,
                 _registered_method=True)
         self.FileUploadChunkCreate = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileUploadChunkCreate',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadChunkCreateRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadChunkCreateResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileUploadChunkCreateRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileUploadChunkCreateResponse.FromString,
                 _registered_method=True)
         self.FileUploadBlock = channel.stream_unary(
                 '/nodeapi.StreamAPI/FileUploadBlock',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileBlockData.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadBlockResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileBlockData.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileUploadBlockResponse.FromString,
                 _registered_method=True)
         self.FileUploadCommit = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileUploadCommit',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCommitRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCommitResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileUploadCommitRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileUploadCommitResponse.FromString,
                 _registered_method=True)
         self.FileDownloadCreate = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileDownloadCreate',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadCreateRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadCreateResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileDownloadCreateRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileDownloadCreateResponse.FromString,
                 _registered_method=True)
         self.FileDownloadRangeCreate = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileDownloadRangeCreate',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadRangeCreateRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadCreateResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileDownloadRangeCreateRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileDownloadCreateResponse.FromString,
                 _registered_method=True)
         self.FileDownloadChunkCreate = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileDownloadChunkCreate',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateResponse.FromString,
-                _registered_method=True)
-        self.FileDownloadChunkCreateV2 = channel.unary_unary(
-                '/nodeapi.StreamAPI/FileDownloadChunkCreateV2',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateResponseV2.FromString,
+                request_serializer=nodeapi__pb2.StreamFileDownloadChunkCreateRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileDownloadChunkCreateResponse.FromString,
                 _registered_method=True)
         self.FileDownloadBlock = channel.unary_stream(
                 '/nodeapi.StreamAPI/FileDownloadBlock',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadBlockRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileBlockData.FromString,
+                request_serializer=nodeapi__pb2.StreamFileDownloadBlockRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileBlockData.FromString,
                 _registered_method=True)
         self.FileList = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileList',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileListRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileListResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileListRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileListResponse.FromString,
+                _registered_method=True)
+        self.FileListChunks = channel.unary_unary(
+                '/nodeapi.StreamAPI/FileListChunks',
+                request_serializer=nodeapi__pb2.StreamFileListChunksRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileListChunksResponse.FromString,
                 _registered_method=True)
         self.FileView = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileView',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileViewRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileViewResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileViewRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileViewResponse.FromString,
                 _registered_method=True)
         self.FileVersions = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileVersions',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileListVersionsRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileListVersionsResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileListVersionsRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileListVersionsResponse.FromString,
                 _registered_method=True)
         self.FileDelete = channel.unary_unary(
                 '/nodeapi.StreamAPI/FileDelete',
-                request_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDeleteRequest.SerializeToString,
-                response_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDeleteResponse.FromString,
+                request_serializer=nodeapi__pb2.StreamFileDeleteRequest.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileDeleteResponse.FromString,
+                _registered_method=True)
+        self.FileUploadBlockUnary = channel.unary_unary(
+                '/nodeapi.StreamAPI/FileUploadBlockUnary',
+                request_serializer=nodeapi__pb2.StreamFileBlockData.SerializeToString,
+                response_deserializer=nodeapi__pb2.StreamFileUploadBlockResponse.FromString,
                 _registered_method=True)
 
 
@@ -350,12 +355,6 @@ class StreamAPIServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def FileDownloadChunkCreateV2(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def FileDownloadBlock(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -363,6 +362,12 @@ class StreamAPIServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def FileList(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FileListChunks(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -386,73 +391,84 @@ class StreamAPIServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def FileUploadBlockUnary(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_StreamAPIServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'FileUploadCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileUploadCreate,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCreateRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCreateResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileUploadCreateRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileUploadCreateResponse.SerializeToString,
             ),
             'FileUploadChunkCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileUploadChunkCreate,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadChunkCreateRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadChunkCreateResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileUploadChunkCreateRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileUploadChunkCreateResponse.SerializeToString,
             ),
             'FileUploadBlock': grpc.stream_unary_rpc_method_handler(
                     servicer.FileUploadBlock,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileBlockData.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadBlockResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileBlockData.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileUploadBlockResponse.SerializeToString,
             ),
             'FileUploadCommit': grpc.unary_unary_rpc_method_handler(
                     servicer.FileUploadCommit,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCommitRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCommitResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileUploadCommitRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileUploadCommitResponse.SerializeToString,
             ),
             'FileDownloadCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDownloadCreate,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadCreateRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadCreateResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileDownloadCreateRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileDownloadCreateResponse.SerializeToString,
             ),
             'FileDownloadRangeCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDownloadRangeCreate,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadRangeCreateRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadCreateResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileDownloadRangeCreateRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileDownloadCreateResponse.SerializeToString,
             ),
             'FileDownloadChunkCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDownloadChunkCreate,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateResponse.SerializeToString,
-            ),
-            'FileDownloadChunkCreateV2': grpc.unary_unary_rpc_method_handler(
-                    servicer.FileDownloadChunkCreateV2,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateResponseV2.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileDownloadChunkCreateRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileDownloadChunkCreateResponse.SerializeToString,
             ),
             'FileDownloadBlock': grpc.unary_stream_rpc_method_handler(
                     servicer.FileDownloadBlock,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadBlockRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileBlockData.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileDownloadBlockRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileBlockData.SerializeToString,
             ),
             'FileList': grpc.unary_unary_rpc_method_handler(
                     servicer.FileList,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileListRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileListResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileListRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileListResponse.SerializeToString,
+            ),
+            'FileListChunks': grpc.unary_unary_rpc_method_handler(
+                    servicer.FileListChunks,
+                    request_deserializer=nodeapi__pb2.StreamFileListChunksRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileListChunksResponse.SerializeToString,
             ),
             'FileView': grpc.unary_unary_rpc_method_handler(
                     servicer.FileView,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileViewRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileViewResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileViewRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileViewResponse.SerializeToString,
             ),
             'FileVersions': grpc.unary_unary_rpc_method_handler(
                     servicer.FileVersions,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileListVersionsRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileListVersionsResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileListVersionsRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileListVersionsResponse.SerializeToString,
             ),
             'FileDelete': grpc.unary_unary_rpc_method_handler(
                     servicer.FileDelete,
-                    request_deserializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDeleteRequest.FromString,
-                    response_serializer=private_dot_pb_dot_nodeapi__pb2.StreamFileDeleteResponse.SerializeToString,
+                    request_deserializer=nodeapi__pb2.StreamFileDeleteRequest.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileDeleteResponse.SerializeToString,
+            ),
+            'FileUploadBlockUnary': grpc.unary_unary_rpc_method_handler(
+                    servicer.FileUploadBlockUnary,
+                    request_deserializer=nodeapi__pb2.StreamFileBlockData.FromString,
+                    response_serializer=nodeapi__pb2.StreamFileUploadBlockResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -481,8 +497,8 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileUploadCreate',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCreateRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCreateResponse.FromString,
+            nodeapi__pb2.StreamFileUploadCreateRequest.SerializeToString,
+            nodeapi__pb2.StreamFileUploadCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -508,8 +524,8 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileUploadChunkCreate',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileUploadChunkCreateRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileUploadChunkCreateResponse.FromString,
+            nodeapi__pb2.StreamFileUploadChunkCreateRequest.SerializeToString,
+            nodeapi__pb2.StreamFileUploadChunkCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -535,8 +551,8 @@ class StreamAPI(object):
             request_iterator,
             target,
             '/nodeapi.StreamAPI/FileUploadBlock',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileBlockData.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileUploadBlockResponse.FromString,
+            nodeapi__pb2.StreamFileBlockData.SerializeToString,
+            nodeapi__pb2.StreamFileUploadBlockResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -562,8 +578,8 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileUploadCommit',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCommitRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileUploadCommitResponse.FromString,
+            nodeapi__pb2.StreamFileUploadCommitRequest.SerializeToString,
+            nodeapi__pb2.StreamFileUploadCommitResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -589,8 +605,8 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileDownloadCreate',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadCreateRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadCreateResponse.FromString,
+            nodeapi__pb2.StreamFileDownloadCreateRequest.SerializeToString,
+            nodeapi__pb2.StreamFileDownloadCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -616,8 +632,8 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileDownloadRangeCreate',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadRangeCreateRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadCreateResponse.FromString,
+            nodeapi__pb2.StreamFileDownloadRangeCreateRequest.SerializeToString,
+            nodeapi__pb2.StreamFileDownloadCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -643,35 +659,8 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileDownloadChunkCreate',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def FileDownloadChunkCreateV2(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/nodeapi.StreamAPI/FileDownloadChunkCreateV2',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadChunkCreateResponseV2.FromString,
+            nodeapi__pb2.StreamFileDownloadChunkCreateRequest.SerializeToString,
+            nodeapi__pb2.StreamFileDownloadChunkCreateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -697,8 +686,8 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileDownloadBlock',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDownloadBlockRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileBlockData.FromString,
+            nodeapi__pb2.StreamFileDownloadBlockRequest.SerializeToString,
+            nodeapi__pb2.StreamFileBlockData.FromString,
             options,
             channel_credentials,
             insecure,
@@ -724,8 +713,35 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileList',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileListRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileListResponse.FromString,
+            nodeapi__pb2.StreamFileListRequest.SerializeToString,
+            nodeapi__pb2.StreamFileListResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FileListChunks(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/nodeapi.StreamAPI/FileListChunks',
+            nodeapi__pb2.StreamFileListChunksRequest.SerializeToString,
+            nodeapi__pb2.StreamFileListChunksResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -751,8 +767,8 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileView',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileViewRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileViewResponse.FromString,
+            nodeapi__pb2.StreamFileViewRequest.SerializeToString,
+            nodeapi__pb2.StreamFileViewResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -778,8 +794,8 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileVersions',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileListVersionsRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileListVersionsResponse.FromString,
+            nodeapi__pb2.StreamFileListVersionsRequest.SerializeToString,
+            nodeapi__pb2.StreamFileListVersionsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -805,8 +821,35 @@ class StreamAPI(object):
             request,
             target,
             '/nodeapi.StreamAPI/FileDelete',
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDeleteRequest.SerializeToString,
-            private_dot_pb_dot_nodeapi__pb2.StreamFileDeleteResponse.FromString,
+            nodeapi__pb2.StreamFileDeleteRequest.SerializeToString,
+            nodeapi__pb2.StreamFileDeleteResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FileUploadBlockUnary(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/nodeapi.StreamAPI/FileUploadBlockUnary',
+            nodeapi__pb2.StreamFileBlockData.SerializeToString,
+            nodeapi__pb2.StreamFileUploadBlockResponse.FromString,
             options,
             channel_credentials,
             insecure,

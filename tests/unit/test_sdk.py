@@ -321,84 +321,10 @@ class TestSDK:
         with pytest.raises(SDKError, match="Invalid bucket name"):
             sdk._validate_bucket_name("ab", "TestMethod")
     
-    @patch('sdk.sdk.nodeapi_pb2.BucketCreateRequest')
-    def test_create_bucket_success(self, mock_request, mock_ipc_stub, mock_node_stub, mock_channel):
-        config = SDKConfig(address="test.node.ai:5500", private_key="test_key")
-        mock_channel.return_value = Mock()
-        
-        sdk = SDK(config)
-        
-        # Mock response
-        mock_response = Mock()
-        mock_response.name = "test-bucket"
-        mock_response.created_at = Mock()
-        mock_response.created_at.AsTime.return_value = datetime.now()
-        
-        sdk.client.BucketCreate.return_value = mock_response
-        
-        result = sdk.create_bucket("test-bucket")
-        
-        assert isinstance(result, BucketCreateResult)
-        assert result.name == "test-bucket"
-        sdk.client.BucketCreate.assert_called_once()
+    # Bucket methods have been removed from SDK class and moved to IPC API
+    # Tests for bucket operations should be in test_sdk_ipc.py
     
-    def test_create_bucket_invalid_name(self, mock_ipc_stub, mock_node_stub, mock_channel):
-        config = SDKConfig(address="test.node.ai:5500", private_key="test_key")
-        mock_channel.return_value = Mock()
-        
-        sdk = SDK(config)
-        
-        with pytest.raises(SDKError, match="Invalid bucket name"):
-            sdk.create_bucket("ab")  # Too short
-    
-    @patch('sdk.sdk.nodeapi_pb2.BucketViewRequest')
-    def test_view_bucket_success(self, mock_request, mock_ipc_stub, mock_node_stub, mock_channel):
-        config = SDKConfig(address="test.node.ai:5500", private_key="test_key")
-        mock_channel.return_value = Mock()
-        
-        sdk = SDK(config)
-        
-        # Mock response
-        mock_response = Mock()
-        mock_response.name = "test-bucket"
-        mock_response.created_at = Mock()
-        mock_response.created_at.AsTime.return_value = datetime.now()
-        
-        sdk.client.BucketView.return_value = mock_response
-        
-        result = sdk.view_bucket("test-bucket")
-        
-        assert isinstance(result, Bucket)
-        assert result.name == "test-bucket"
-        sdk.client.BucketView.assert_called_once()
-    
-    @patch('sdk.sdk.nodeapi_pb2.BucketDeleteRequest')
-    def test_delete_bucket_success(self, mock_request, mock_ipc_stub, mock_node_stub, mock_channel):
-        config = SDKConfig(address="test.node.ai:5500", private_key="test_key")
-        mock_channel.return_value = Mock()
-        
-        sdk = SDK(config)
-        
-        sdk.client.BucketDelete.return_value = Mock()
-        
-        result = sdk.delete_bucket("test-bucket")
-        
-        assert result is True
-        sdk.client.BucketDelete.assert_called_once()
-    
-    @patch('sdk.sdk.StreamingAPI')
-    def test_streaming_api(self, mock_streaming_api, mock_ipc_stub, mock_node_stub, mock_channel):
-        config = SDKConfig(address="test.node.ai:5500", private_key="test_key")
-        mock_channel.return_value = Mock()
-        
-        sdk = SDK(config)
-        mock_streaming_instance = Mock()
-        mock_streaming_api.return_value = mock_streaming_instance
-        
-        result = sdk.streaming_api()
-        
-        assert result == mock_streaming_instance
-        mock_streaming_api.assert_called_once()
+    # StreamingAPI has been removed from SDK class
     
     @patch('sdk.sdk.IPC')
     @patch('sdk.sdk.Client.dial')

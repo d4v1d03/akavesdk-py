@@ -2,17 +2,23 @@ import grpc
 import logging
 import io
 import time
-import random
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Callable, TypeVar, List, Dict, Any
 from private.pb import nodeapi_pb2, nodeapi_pb2_grpc, ipcnodeapi_pb2, ipcnodeapi_pb2_grpc
 from private.ipc.client import Client
+from private.retry.retry import WithRetry
 from .sdk_ipc import IPC
 from .config import Config, SDKConfig, SDKError, BLOCK_SIZE, MIN_BUCKET_NAME_LENGTH
 from private.encryption import derive_key
 from .shared.grpc_base import GrpcClientBase
+
+try:
+    import requests
+    HTTP_CLIENT_AVAILABLE = True
+except ImportError:
+    HTTP_CLIENT_AVAILABLE = False
 
 ENCRYPTION_OVERHEAD = 28  # 16 bytes for AES-GCM tag, 12 bytes for nonce
 MIN_FILE_SIZE = 127  # 127 bytes
@@ -87,37 +93,6 @@ class MonkitStats:
     success_times: Optional[List[float]] = None  
     failure_times: Optional[List[float]] = None  
 
-@dataclass
-class WithRetry:
-    max_attempts: int = 5
-    base_delay: float = 0.1  # 100ms in seconds
-
-    def do(self, ctx, func: Callable[[], tuple[bool, Optional[Exception]]]) -> Optional[Exception]:
-        needs_retry, err = func()
-        if err is None:
-            return None
-        if not needs_retry or self.max_attempts == 0:
-            return err
-
-        def sleep_duration(attempt: int, base: float) -> float:
-            backoff = base * (2 ** attempt)
-            jitter = random.uniform(0, base)
-            return backoff + jitter
-
-        for attempt in range(self.max_attempts):
-            delay = sleep_duration(attempt, self.base_delay)
-            
-            logging.debug(f"retrying attempt {attempt}, delay {delay}s, err: {err}")
-            
-            time.sleep(delay)
-            
-            needs_retry, err = func()
-            if err is None:
-                return None
-            if not needs_retry:
-                return err
-        
-        return Exception(f"max retries exceeded: {err}")
 
 class SDKOption:
     def apply(self, sdk: 'SDK'):
@@ -162,9 +137,23 @@ class WithChunkBuffer(SDKOption):
     def apply(self, sdk: 'SDK'):
         sdk.chunk_buffer = self.buffer_size
 
+class WithBatchSize(SDKOption):
+    def __init__(self, batch_size: int):
+        self.batch_size = max(1, batch_size)  # Ensure at least 1
+    
+    def apply(self, sdk: 'SDK'):
+        sdk.batch_size = self.batch_size
+
+class WithCustomHttpClient(SDKOption):
+    def __init__(self, client):
+        self.client = client
+    
+    def apply(self, sdk: 'SDK'):
+        sdk.http_client = self.client
+
 class WithoutRetry(SDKOption):
     def apply(self, sdk: 'SDK'):
-        sdk.with_retry = WithRetry(max_attempts=0)
+        sdk.with_retry = WithRetry(max_attempts=0, base_delay=0.1)
 
 class SDK():
     def __init__(self, config: SDKConfig):
@@ -177,6 +166,16 @@ class SDK():
         self.config.encryption_key = config.encryption_key or []
         self.ipc_address = config.ipc_address or config.address  # Use provided IPC address or fallback to main address
         self._contract_info = None
+        
+        # Initialize HTTP client
+        if HTTP_CLIENT_AVAILABLE:
+            self.http_client = requests.Session()
+        else:
+            self.http_client = None
+        
+        # Initialize batch size and retry settings
+        self.batch_size = 1
+        self.with_retry = WithRetry(max_attempts=5, base_delay=0.1)
 
         if self.config.block_part_size <= 0 or self.config.block_part_size > BLOCK_SIZE:
             raise SDKError(f"Invalid blockPartSize: {config.block_part_size}. Valid range is 1-{BLOCK_SIZE}")
@@ -193,6 +192,12 @@ class SDK():
 
         if len(self.config.encryption_key) != 0 and len(self.config.encryption_key) != 32:
             raise SDKError("Encryption key length should be 32 bytes long")
+        
+        # Sanitize retry params
+        if self.with_retry.max_attempts < 0:
+            self.with_retry.max_attempts = 0
+        if self.with_retry.base_delay <= 0.1:
+            self.with_retry.base_delay = 0.1
 
     def _fetch_contract_info(self) -> Optional[dict]:
         """Dynamically fetch contract information using multiple endpoints"""
@@ -228,7 +233,9 @@ class SDK():
         return None
 
     def close(self):
-        """Close the gRPC channels."""
+        """Close the gRPC channels and HTTP client."""
+        if self.http_client and HTTP_CLIENT_AVAILABLE:
+            self.http_client.close()
         if self.conn:
             self.conn.close()
         if self.ipc_conn and self.ipc_conn != self.conn:
@@ -278,48 +285,14 @@ class SDK():
                 client=self.ipc_client,
                 conn=self.ipc_conn,  # Use the IPC connection
                 ipc_instance=ipc_instance,
-                config=self.config
+                config=self.config,
+                http_client=self.http_client,
+                batch_size=self.batch_size,
+                with_retry=self.with_retry
             )
         except Exception as e:
             raise SDKError(f"Failed to initialize IPC API: {str(e)}")
     
-    def _validate_bucket_name(self, name: str, method_name: str) -> None:
-        if not name or len(name) < MIN_BUCKET_NAME_LENGTH:
-            raise SDKError(
-                f"{method_name}: Invalid bucket name '{name}'. "
-                f"Must be at least {MIN_BUCKET_NAME_LENGTH} characters "
-                f"(got {len(name) if name else 0})."
-            )
-    def _do_grpc_call(self, method_name: str, grpc_method: Callable[..., T], request) -> T:
-        try:
-            return grpc_method(request, timeout=self.config.connection_timeout)
-        except grpc.RpcError as e:
-            self._grpc_base._handle_grpc_error(method_name, e)
-            raise  # for making type checkers happy
-
-    def create_bucket(self, name: str) -> BucketCreateResult:
-        self._validate_bucket_name(name, "BucketCreate")
-        request = nodeapi_pb2.BucketCreateRequest(name=name)
-        response = self._do_grpc_call("BucketCreate", self.client.BucketCreate, request)
-        return BucketCreateResult(
-            name=response.name,
-            created_at=parse_timestamp(response.created_at)
-        )
-    
-    def view_bucket(self, name: str)-> Bucket:
-        self._validate_bucket_name(name, "BucketView")
-        request = nodeapi_pb2.BucketViewRequest(bucket_name=name)
-        response = self._do_grpc_call("BucketView", self.client.BucketView, request)
-        return Bucket(
-            name=response.name,
-            created_at=parse_timestamp(response.created_at)
-        )
-    
-    def delete_bucket(self, name: str):
-        self._validate_bucket_name(name, "BucketDelete")
-        request = nodeapi_pb2.BucketDeleteRequest(name=name)
-        self._do_grpc_call("BucketDelete", self.client.BucketDelete, request)
-        return True
 
 
 def get_monkit_stats() -> List[MonkitStats]:

@@ -8,6 +8,9 @@ if PRIVATE_PATH not in sys.path:
     sys.path.append(PRIVATE_PATH)
 
 try:
+    # Import WithRetry from retry module
+    from private.retry.retry import WithRetry
+    
     from .sdk import (
         # Core SDK class
         SDK,
@@ -16,7 +19,6 @@ try:
         BucketCreateResult,
         Bucket,
         MonkitStats,
-        WithRetry,
         AkaveContractFetcher,
         
         # SDK Options
@@ -27,6 +29,8 @@ try:
         WithStreamingMaxBlocksInChunk,
         WithErasureCoding,
         WithChunkBuffer,
+        WithBatchSize,
+        WithCustomHttpClient,
         WithoutRetry,
         
         # Utility functions

@@ -130,7 +130,7 @@ def to_ipc_proto_chunk(chunk_cid, index: int, size: int, blocks):
     return cids, sizes, proto_chunk, None
 
 class IPC:
-    def __init__(self, client, conn, ipc_instance, config: SDKConfig):
+    def __init__(self, client, conn, ipc_instance, config: SDKConfig, http_client=None, batch_size=1, with_retry=None):
         self.client = client
         self.conn = conn
         self.ipc = ipc_instance
@@ -140,9 +140,11 @@ class IPC:
         self.encryption_key = config.encryption_key if config.encryption_key else b''
         self.max_blocks_in_chunk = config.streaming_max_blocks_in_chunk
         self.chunk_buffer = config.chunk_buffer
+        self.http_client = http_client
+        self.batch_size = batch_size
         
-        from .sdk import WithRetry
-        self.with_retry = WithRetry()
+        from private.retry.retry import WithRetry
+        self.with_retry = with_retry if with_retry is not None else WithRetry(max_attempts=5, base_delay=0.1)
 
     def create_bucket(self, ctx, name: str) -> IPCBucketCreateResult:
         if len(name) < MIN_BUCKET_NAME_LENGTH:

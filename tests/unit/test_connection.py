@@ -73,36 +73,36 @@ class TestCreateIPCClient:
 
 class TestCreateStreamingClient:
     
-    def test_create_streaming_client_pooled(self):
+    def test_create_archival_client_pooled(self):
         pool = ConnectionPool()
         mock_conn = Mock()
         
         with patch.object(pool, '_get', return_value=(mock_conn, None)):
-            stub, closer, err = pool.create_streaming_client("test:5500", pooled=True)
+            stub, closer, err = pool.create_archival_client("test:5500", pooled=True)
             
             assert stub is not None
             assert closer is None
             assert err is None
     
-    def test_create_streaming_client_pooled_with_error(self):
+    def test_create_archival_client_pooled_with_error(self):
         pool = ConnectionPool()
         error = SDKError("Get connection failed")
         
         with patch.object(pool, '_get', return_value=(None, error)):
-            stub, closer, err = pool.create_streaming_client("test:5500", pooled=True)
+            stub, closer, err = pool.create_archival_client("test:5500", pooled=True)
             
             assert stub is None
             assert closer is None
             assert err == error
     
     @patch('grpc.insecure_channel')
-    def test_create_streaming_client_not_pooled(self, mock_channel):
+    def test_create_archival_client_not_pooled(self, mock_channel):
         pool = ConnectionPool()
         mock_conn = Mock()
         mock_conn.close = Mock()
         mock_channel.return_value = mock_conn
         
-        stub, closer, err = pool.create_streaming_client("test:5500", pooled=False)
+        stub, closer, err = pool.create_archival_client("test:5500", pooled=False)
         
         assert stub is not None
         assert closer is not None
@@ -110,16 +110,16 @@ class TestCreateStreamingClient:
         mock_channel.assert_called_once_with("test:5500")
     
     @patch('grpc.insecure_channel')
-    def test_create_streaming_client_exception(self, mock_channel):
+    def test_create_archival_client_exception(self, mock_channel):
         pool = ConnectionPool()
-        mock_channel.side_effect = Exception("Streaming connection error")
+        mock_channel.side_effect = Exception("Archival connection error")
         
-        stub, closer, err = pool.create_streaming_client("test:5500", pooled=False)
+        stub, closer, err = pool.create_archival_client("test:5500", pooled=False)
         
         assert stub is None
         assert closer is None
         assert isinstance(err, SDKError)
-        assert "Failed to create streaming client" in str(err)
+        assert "Failed to create archival client" in str(err)
 
 
 class TestGet:
@@ -337,7 +337,7 @@ class TestConnectionPoolIntegration:
         assert stub1 is not None
         assert closer1 is not None
         
-        stub2, closer2, err2 = pool.create_streaming_client("addr2:5500", pooled=False)
+        stub2, closer2, err2 = pool.create_archival_client("addr2:5500", pooled=False)
         assert err2 is None
         assert stub2 is not None
         assert closer2 is not None

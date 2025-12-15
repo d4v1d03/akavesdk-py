@@ -57,9 +57,13 @@ try:
         IPCFileDownload,
         FileChunkDownload,
         Chunk,
-        AkaveBlockData,
         FileBlockUpload,
-        FileBlockDownload
+        FileBlockDownload,
+        ArchivalMetadata,
+        ArchivalChunk,
+        ArchivalBlock,
+        PDPBlockData,
+        ErrMissingArchivalBlock
     )
     
     _SDK_AVAILABLE = True
@@ -195,10 +199,6 @@ except ImportError as e:
         def __init__(self, *args, **kwargs):
             raise ImportError("SDK not available due to missing dependencies")
     
-    class AkaveBlockData:
-        def __init__(self, *args, **kwargs):
-            raise ImportError("SDK not available due to missing dependencies")
-    
     class FileBlockUpload:
         def __init__(self, *args, **kwargs):
             raise ImportError("SDK not available due to missing dependencies")
@@ -206,6 +206,25 @@ except ImportError as e:
     class FileBlockDownload:
         def __init__(self, *args, **kwargs):
             raise ImportError("SDK not available due to missing dependencies")
+    
+    class ArchivalMetadata:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SDK not available due to missing dependencies")
+    
+    class ArchivalChunk:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SDK not available due to missing dependencies")
+    
+    class ArchivalBlock:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SDK not available due to missing dependencies")
+    
+    class PDPBlockData:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SDK not available due to missing dependencies")
+    
+    class ErrMissingArchivalBlock(Exception):
+        pass
 
 try:
     from .config import SDKConfig, SDKError, Config
@@ -290,7 +309,11 @@ __all__ = [
     'IPCFileDownload',
     'FileChunkDownload',
     'Chunk',
-    'AkaveBlockData',
     'FileBlockUpload',
     'FileBlockDownload',
+    'ArchivalMetadata',
+    'ArchivalChunk',
+    'ArchivalBlock',
+    'PDPBlockData',
+    'ErrMissingArchivalBlock',
 ]

@@ -18,7 +18,7 @@ from .dag import DAGRoot, build_dag, extract_block_data
 from .connection import ConnectionPool
 from .model import (
     IPCBucketCreateResult, IPCBucket, IPCFileMeta, IPCFileListItem,
-    IPCFileMetaV2, IPCFileChunkUploadV2, AkaveBlockData, FileBlockUpload,
+    IPCFileMetaV2, IPCFileChunkUploadV2, FileBlockUpload,
     FileBlockDownload, Chunk, IPCFileDownload, FileChunkDownload,
     IPCFileUpload, new_ipc_file_upload, UploadState
 )
@@ -785,7 +785,7 @@ class IPC:
             
             block_size = BlockSize
             
-            chunk_dag = build_dag(ctx, io.BytesIO(data), block_size, None)
+            chunk_dag = build_dag(ctx, io.BytesIO(data), block_size)
             if chunk_dag is None:
                 raise SDKError("build_dag returned None")
             
@@ -1032,7 +1032,7 @@ class IPC:
                     TypedData("chunkCID", "bytes"),
                     TypedData("blockCID", "bytes32"), 
                     TypedData("chunkIndex", "uint256"),
-                    TypedData("blockIndex", "uint8"),
+                    TypedData("blockIndex", "uint256"),
                     TypedData("nodeId", "bytes32"),
                     TypedData("nonce", "uint256"),
                     TypedData("deadline", "uint256"),
@@ -1051,7 +1051,7 @@ class IPC:
                 "chunkCID": bytes(chunk_cid_bytes),     
                 "blockCID": bytes(bcid),                
                 "chunkIndex": to_int(chunk_index),
-                "blockIndex": int(block_index) & 0xFF,
+                "blockIndex": int(block_index),
                 "nodeId": bytes(node_id_32),       
                 "nonce": to_int(nonce),
                 "deadline": to_int(deadline),
@@ -1064,7 +1064,7 @@ class IPC:
                 key_str = str(self.ipc.auth.key).replace('0x', '')
                 private_key_bytes = bytes.fromhex(key_str)
             
-            signature_bytes = sign(private_key_bytes, domain, data_message, data_types)
+            signature_bytes = sign(private_key_bytes, domain, "StorageData", data_types, data_message)
             signature_hex = signature_bytes.hex()
             
             return signature_hex, nonce_bytes
@@ -1085,10 +1085,10 @@ class IPC:
         block
     ) -> bytes:
         try:
-            if (not hasattr(block, 'akave') or not block.akave) and (not hasattr(block, 'filecoin') or not block.filecoin):
+            if not hasattr(block, 'node_address') or not block.node_address:
                 raise SDKError("missing block metadata")
             
-            client, closer, err = pool.create_ipc_client(block.akave.node_address, self.use_connection_pool)
+            client, closer, err = pool.create_ipc_client(block.node_address, self.use_connection_pool)
             if err:
                 raise SDKError(f"failed to create client: {str(err)}")
             
@@ -1307,12 +1307,9 @@ class IPC:
                 blocks.append(FileBlockDownload(
                     cid=block.cid,
                     data=b"",
-                    akave=AkaveBlockData(
-                        node_id=block.node_id,
-                        node_address=block.node_address,
-                        permit=block.permit
-                    ),
-                    filecoin=None
+                    permit=block.permit,
+                    node_address=block.node_address,
+                    node_id=block.node_id
                 ))
             
             return FileChunkDownload(

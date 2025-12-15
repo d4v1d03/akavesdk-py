@@ -266,21 +266,6 @@ class TestBuildDAG:
         assert result.raw_data_size == len(data)
         assert len(result.blocks) >= 2  # Should be split into multiple blocks
     
-    @patch('sdk.dag.encrypt')
-    def test_build_dag_with_encryption(self, mock_encrypt):
-        """Test build_dag with encryption key."""
-        data = b"Secret data"
-        encrypted_data = b"encrypted_secret_data"
-        reader = io.BytesIO(data)
-        enc_key = b"encryption_key_32_bytes_test123"
-        
-        mock_encrypt.return_value = encrypted_data
-        
-        result = build_dag(None, reader, 1024, enc_key)
-        
-        assert isinstance(result, ChunkDAG)
-        mock_encrypt.assert_called_once_with(enc_key, data, b"dag_encryption")
-    
     @patch('sdk.dag._create_unixfs_file_node')
     def test_build_dag_create_unixfs_node_called(self, mock_create_unixfs):
         """Test that _create_unixfs_file_node is called."""

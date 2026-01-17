@@ -3,7 +3,7 @@ import time
 import threading
 import logging
 from typing import Dict, Optional, Tuple, Callable
-from private.pb import nodeapi_pb2_grpc, ipcnodeapi_pb2_grpc
+from private.pb import ipcnodeapi_pb2_grpc
 from .config import SDKError
 
 

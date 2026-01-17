@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Callable, TypeVar, List, Dict, Any
-from private.pb import nodeapi_pb2, nodeapi_pb2_grpc, ipcnodeapi_pb2, ipcnodeapi_pb2_grpc
+from private.pb import ipcnodeapi_pb2, ipcnodeapi_pb2_grpc
 from private.ipc.client import Client
 from private.retry.retry import WithRetry
 from .sdk_ipc import IPC
@@ -181,7 +181,6 @@ class SDK():
             raise SDKError(f"Invalid blockPartSize: {config.block_part_size}. Valid range is 1-{BLOCK_SIZE}")
 
         self.conn = grpc.insecure_channel(config.address)
-        self.client = nodeapi_pb2_grpc.NodeAPIStub(self.conn)
        
         if self.ipc_address == config.address:
             self.ipc_conn = self.conn

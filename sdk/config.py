@@ -27,16 +27,15 @@ EncryptionOverhead = 16  # 16 bytes overhead from encryption
 
 class Config:
     """Configuration for the Ethereum storage contract client."""
-    def __init__(self, dial_uri: str, private_key: str, storage_contract_address: str, access_contract_address: Optional[str] = None, policy_factory_contract_address: Optional[str] = None):
+    def __init__(self, dial_uri: str, private_key: str, storage_contract_address: str, access_contract_address: Optional[str] = None):
         self.dial_uri = dial_uri
         self.private_key = private_key
         self.storage_contract_address = storage_contract_address
         self.access_contract_address = access_contract_address
-        self.policy_factory_contract_address = policy_factory_contract_address or ""
 
     @staticmethod
     def default():
-        return Config(dial_uri="", private_key="", storage_contract_address="", access_contract_address="", policy_factory_contract_address="")
+        return Config(dial_uri="", private_key="", storage_contract_address="", access_contract_address="")
 
 
 ## [SDK Error Class]

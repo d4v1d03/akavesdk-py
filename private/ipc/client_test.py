@@ -40,20 +40,18 @@ def generate_random_nonce() -> int:
 class TestClient:
 
     def test_config_default(self):
-        config = Config.default()
+        config = Config()
         assert config.dial_uri == ""
         assert config.private_key == ""
         assert config.storage_contract_address == ""
         assert config.access_contract_address == ""
-        assert config.policy_factory_contract_address == ""
 
     def test_config_creation(self):
         config = Config(
             dial_uri="http://localhost:8545",
             private_key="0x123",
             storage_contract_address="0xstorage",
-            access_contract_address="0xaccess",
-            policy_factory_contract_address="0xpolicy"
+            access_contract_address="0xaccess"
         )
         assert config.dial_uri == "http://localhost:8545"
         assert config.private_key == "0x123"

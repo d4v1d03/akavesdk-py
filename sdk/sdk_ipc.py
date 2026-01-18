@@ -611,6 +611,7 @@ class IPC:
     def _upload_with_comprehensive_debug(self, ctx, file_upload: IPCFileUpload, reader: io.IOBase, bucket_id: bytes,
                                         encrypted_file_name: str, encrypted_bucket_name: str, file_enc_key: bytes,
                                         buffer_size: int) -> IPCFileMetaV2:
+        pool = ConnectionPool()
         try:
             chunk_index = file_upload.state.chunk_count
             total_chunks_uploaded = 0
@@ -674,7 +675,7 @@ class IPC:
 
                 file_upload.state.pre_create_chunk(chunk_upload, tx_hash)
                 
-                err = self.upload_chunk(ctx, chunk_upload)
+                err = self.upload_chunk(ctx, chunk_upload, pool)
                 if err is not None:
                     raise err
 
@@ -743,6 +744,11 @@ class IPC:
 
         except Exception as err:
             raise SDKError(f"upload failed: {str(err)}")
+        finally:
+            try:
+                pool.close()
+            except Exception as e:
+                logging.warning(f"Error closing connection pool: {str(e)}")
     
     def _calculate_file_id(self, bucket_id: bytes, file_name: str) -> bytes:
         try:
@@ -839,53 +845,44 @@ class IPC:
         except Exception as err:
             raise SDKError(f"failed to create chunk upload: {str(err)}")
 
-    def upload_chunk(self, ctx, file_chunk_upload: IPCFileChunkUploadV2) -> None:
+    def upload_chunk(self, ctx, file_chunk_upload: IPCFileChunkUploadV2, pool: ConnectionPool) -> None:
         try:
-            pool = ConnectionPool()
+            chunk_cid_str = file_chunk_upload.chunk_cid
+            if hasattr(file_chunk_upload.chunk_cid, 'string'):
+                chunk_cid_str = file_chunk_upload.chunk_cid.string()
+            elif hasattr(file_chunk_upload.chunk_cid, 'toString'):
+                chunk_cid_str = file_chunk_upload.chunk_cid.toString()
+            elif not isinstance(file_chunk_upload.chunk_cid, str):
+                chunk_cid_str = str(file_chunk_upload.chunk_cid)
             
-            try:
-                chunk_cid_str = file_chunk_upload.chunk_cid
-                if hasattr(file_chunk_upload.chunk_cid, 'string'):
-                    chunk_cid_str = file_chunk_upload.chunk_cid.string()
-                elif hasattr(file_chunk_upload.chunk_cid, 'toString'):
-                    chunk_cid_str = file_chunk_upload.chunk_cid.toString()
-                elif not isinstance(file_chunk_upload.chunk_cid, str):
-                    chunk_cid_str = str(file_chunk_upload.chunk_cid)
+            cids, sizes, proto_chunk, err = to_ipc_proto_chunk(
+                chunk_cid_str,
+                file_chunk_upload.index,
+                file_chunk_upload.actual_size,
+                file_chunk_upload.blocks
+            )
+            if err:
+                raise err
+            
+            # Upload all blocks in parallel
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrency) as executor:
+                futures = {}
                 
-                cids, sizes, proto_chunk, err = to_ipc_proto_chunk(
-                    chunk_cid_str,
-                    file_chunk_upload.index,
-                    file_chunk_upload.actual_size,
-                    file_chunk_upload.blocks
-                )
-                if err:
-                    raise err
+                for i, block in enumerate(file_chunk_upload.blocks):
+                    future = executor.submit(
+                        self._upload_block,
+                        ctx, pool, i, block, proto_chunk, 
+                        file_chunk_upload.bucket_id, file_chunk_upload.file_name
+                    )
+                    futures[future] = i
                 
-                # Upload all blocks in parallel
-                with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrency) as executor:
-                    futures = {}
-                    
-                    for i, block in enumerate(file_chunk_upload.blocks):
-                        future = executor.submit(
-                            self._upload_block,
-                            ctx, pool, i, block, proto_chunk, 
-                            file_chunk_upload.bucket_id, file_chunk_upload.file_name
-                        )
-                        futures[future] = i
-                    
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            future.result()  
-                        except Exception as e:
-                            for f in futures:
-                                f.cancel()
-                            raise e
-                            
-            finally:
-                try:
-                    pool.close()
-                except Exception as e:
-                    logging.warning(f"Error closing connection pool: {str(e)}")
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        future.result()  
+                    except Exception as e:
+                        for f in futures:
+                            f.cancel()
+                        raise e
             
         except Exception as err:
             raise SDKError(f"failed to upload chunk: {str(err)}")
@@ -1261,6 +1258,7 @@ class IPC:
             raise SDKError(f"failed to set public access: {str(err)}")
             
     def download(self, ctx, file_download, writer: io.IOBase):
+        pool = ConnectionPool()
         try:
             file_enc_key = encryption_key(
                 self.encryption_key, 
@@ -1281,6 +1279,7 @@ class IPC:
                 
                 self.download_chunk_blocks(
                     ctx,
+                    pool,
                     file_download.bucket_name,
                     file_download.name,
                     self.ipc.auth.address,
@@ -1292,6 +1291,11 @@ class IPC:
             return None
         except Exception as err:
             raise SDKError(f"failed to download file: {str(err)}")
+        finally:
+            try:
+                pool.close()
+            except Exception as e:
+                logging.warning(f"Error closing connection pool: {str(e)}")
             
     def create_chunk_download(self, ctx, bucket_name: str, file_name: str, chunk):
         try:
@@ -1324,43 +1328,36 @@ class IPC:
         except Exception as err:
             raise SDKError(f"failed to create chunk download: {str(err)}")
             
-    def download_chunk_blocks(self, ctx, bucket_name: str, file_name: str, address: str, 
+    def download_chunk_blocks(self, ctx, pool: ConnectionPool, bucket_name: str, file_name: str, address: str, 
                              chunk_download, file_encryption_key: bytes, writer: io.IOBase):
         try:
-            pool = ConnectionPool()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrency) as executor:
+                futures = {}
+                
+                for i, block in enumerate(chunk_download.blocks):
+                    futures[executor.submit(
+                        self.fetch_block_data,
+                        ctx, pool, chunk_download.cid, bucket_name, file_name, 
+                        address, chunk_download.index, i, block
+                    )] = i
+                
+                blocks = [None] * len(chunk_download.blocks)
+                for future in concurrent.futures.as_completed(futures):
+                    index = futures[future]
+                    try:
+                        data = future.result()
+                        from .dag import extract_block_data
+                        blocks[index] = extract_block_data(chunk_download.blocks[index].cid, data)
+                    except Exception as e:
+                        raise SDKError(f"failed to download block: {str(e)}")
             
-            try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrency) as executor:
-                    futures = {}
-                    
-                    for i, block in enumerate(chunk_download.blocks):
-                        futures[executor.submit(
-                            self.fetch_block_data,
-                            ctx, pool, chunk_download.cid, bucket_name, file_name, 
-                            address, chunk_download.index, i, block
-                        )] = i
-                    
-                    blocks = [None] * len(chunk_download.blocks)
-                    for future in concurrent.futures.as_completed(futures):
-                        index = futures[future]
-                        try:
-                            data = future.result()
-                            from .dag import extract_block_data
-                            blocks[index] = extract_block_data(chunk_download.blocks[index].cid, data)
-                        except Exception as e:
-                            raise SDKError(f"failed to download block: {str(e)}")
-                
-                data = b"".join([b for b in blocks if b is not None])
-                
-                if file_encryption_key:
-                    from private.encryption import decrypt
-                    data = decrypt(file_encryption_key, data, str(chunk_download.index).encode())
-                
-                writer.write(data)
-            finally:
-                err = pool.close()
-                if err:
-                    logging.warning(f"Error closing connection pool: {str(err)}")
+            data = b"".join([b for b in blocks if b is not None])
+            
+            if file_encryption_key:
+                from private.encryption import decrypt
+                data = decrypt(file_encryption_key, data, str(chunk_download.index).encode())
+            
+            writer.write(data)
             
             return None
         except Exception as err:

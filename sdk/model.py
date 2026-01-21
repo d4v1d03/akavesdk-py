@@ -31,20 +31,6 @@ class Chunk:
 
 
 @dataclass
-class AkaveBlockData:
-    """Akavenode block metadata."""
-    permit: str
-    node_address: str
-    node_id: str
-
-
-@dataclass
-class FilecoinBlockData:
-    """Filecoin block metadata."""
-    base_url: str
-
-
-@dataclass
 class FileBlockUpload:
     """A piece of metadata of some file used for upload."""
     cid: str
@@ -80,8 +66,9 @@ class FileBlockDownload:
     """A piece of metadata of some file used for download."""
     cid: str
     data: bytes
-    filecoin: Optional[FilecoinBlockData] = None
-    akave: Optional[AkaveBlockData] = None
+    permit: str = ""
+    node_address: str = ""
+    node_id: str = ""
 
 
 @dataclass
@@ -286,3 +273,43 @@ def new_ipc_file_upload(bucket_name: str, name: str) -> IPCFileUpload:
         bytes_counter=0,
         chunks_counter=0
     )
+
+
+@dataclass
+class ArchivalMetadata:
+    """Contains file metadata with chunks and blocks including PDP data."""
+    bucket_name: str
+    name: str
+    chunks: List['ArchivalChunk']
+
+
+@dataclass
+class ArchivalChunk:
+    """Contains chunk metadata with blocks."""
+    chunk: Chunk
+    blocks: List['ArchivalBlock']
+
+
+@dataclass
+class ArchivalBlock:
+    """Contains block metadata with PDP data."""
+    cid: str
+    size: int
+    pdp_data: Optional['PDPBlockData'] = None
+
+
+@dataclass
+class PDPBlockData:
+    """Contains PDP data for a block."""
+    url: str
+    offset: int
+    size: int
+    data_set_id: int
+
+
+class ErrMissingArchivalBlock(Exception):
+    """Error returned when archival block metadata is missing."""
+    
+    def __init__(self, block_cid: str):
+        self.block_cid = block_cid
+        super().__init__(f"missing archival block metadata for block CID {block_cid}")

@@ -16,7 +16,6 @@ class Config:
     private_key: str = ""
     storage_contract_address: str = ""
     access_contract_address: str = ""
-    policy_factory_contract_address: str = ""
 
     @staticmethod
     def default_config() -> 'Config':
@@ -27,7 +26,6 @@ class Config:
 class ContractsAddresses:
     storage: str = ""
     access_manager: str = ""
-    policy_factory: str = ""
 
 
 class TransactionFailedError(Exception):
@@ -37,16 +35,12 @@ class TransactionFailedError(Exception):
 class Client:    
     def __init__(self, web3: Web3, auth: LocalAccount, storage: StorageContract, 
                  access_manager: Optional[AccessManagerContract] = None,
-                 policy_factory: Optional[object] = None, 
                  list_policy_abi: Optional[dict] = None,
-                 policy_factory_abi: Optional[dict] = None,
                  addresses: Optional[ContractsAddresses] = None,
                  chain_id: Optional[int] = None):
         self.storage = storage
         self.access_manager = access_manager
-        self.policy_factory = policy_factory
         self.list_policy_abi = list_policy_abi
-        self.policy_factory_abi = policy_factory_abi
         self.auth = auth
         self.eth = web3
         self.addresses = addresses or ContractsAddresses()
@@ -81,23 +75,17 @@ class Client:
         access_manager = None
         if config.access_contract_address:
             access_manager = AccessManagerContract(client, config.access_contract_address)
-
-        policy_factory = None
+        
         list_policy_abi = None
-        policy_factory_abi = None
-        if config.policy_factory_contract_address:
-            try:
-                from .contracts import PolicyFactoryContract, ListPolicyMetaData, PolicyFactoryMetaData
-                policy_factory = PolicyFactoryContract(client, config.policy_factory_contract_address)
-                list_policy_abi = ListPolicyMetaData.ABI
-                policy_factory_abi = PolicyFactoryMetaData.ABI
-            except ImportError:
-                pass  
+        try:
+            from .contracts import ListPolicyMetaData
+            list_policy_abi = ListPolicyMetaData.ABI
+        except ImportError:
+            pass  
         
         addresses = ContractsAddresses(
             storage=config.storage_contract_address,
-            access_manager=config.access_contract_address,
-            policy_factory=config.policy_factory_contract_address
+            access_manager=config.access_contract_address
         )
 
         ipc_client = cls(
@@ -105,9 +93,7 @@ class Client:
             auth=account,
             storage=storage, 
             access_manager=access_manager,
-            policy_factory=policy_factory,
             list_policy_abi=list_policy_abi,
-            policy_factory_abi=policy_factory_abi,
             addresses=addresses,
             chain_id=chain_id
         )
@@ -138,8 +124,7 @@ class Client:
         try:
             from .contracts import (
                 deploy_erc1967_proxy, deploy_access_manager, deploy_list_policy, 
-                deploy_policy_factory, StorageContract, AccessManagerContract, 
-                PolicyFactoryContract, ListPolicyMetaData, PolicyFactoryMetaData
+                StorageContract, AccessManagerContract, ListPolicyMetaData
             )
             
             try:
@@ -186,16 +171,7 @@ class Client:
             base_list_policy_addr, tx_hash, _ = deploy_list_policy(eth_client, account)
             client.wait_for_tx(tx_hash)
             
-            policy_factory_addr, tx_hash, policy_factory = deploy_policy_factory(
-                eth_client, account, base_list_policy_addr
-            )
-            client.wait_for_tx(tx_hash)
-            
-            client.policy_factory = policy_factory
-            client.addresses.policy_factory = policy_factory_addr
-            
             client.list_policy_abi = ListPolicyMetaData.ABI
-            client.policy_factory_abi = PolicyFactoryMetaData.ABI
             
             return client
             
@@ -207,42 +183,6 @@ class Client:
 
     def chain_id(self) -> int:
         return self._chain_id
-
-    def deploy_list_policy(self, user_address: str) -> str:
-        if not self.policy_factory or not self.list_policy_abi:
-            raise ValueError("PolicyFactory or ListPolicy ABI not available")
-        
-        list_policy_contract = self.eth.eth.contract(abi=self.list_policy_abi)
-        abi_bytes = list_policy_contract.encodeABI(fn_name='initialize', args=[user_address])
-        
-        tx_hash = self.policy_factory.deploy_policy(self.auth, bytes.fromhex(abi_bytes[2:]))
-        receipt = self.wait_for_tx(tx_hash)
-        
-        if not self.policy_factory_abi:
-            raise ValueError("PolicyFactory ABI not available")
-            
-        policy_deployed_event = None
-        for item in self.policy_factory_abi:
-            if item.get('type') == 'event' and item.get('name') == 'PolicyDeployed':
-                policy_deployed_event = item
-                break
-        
-        if not policy_deployed_event:
-            raise ValueError("PolicyDeployed event not found in ABI")
-        
-        event_hash = self.eth.keccak(text=f"PolicyDeployed({','.join([input['type'] for input in policy_deployed_event['inputs']])})")
-        
-        policy_instance_address = None
-        for log in receipt.logs:
-            if len(log.topics) >= 3 and log.topics[0] == event_hash:
-                policy_instance_address = Web3.to_checksum_address('0x' + log.topics[2].hex()[-40:])
-                break
-        
-        if not policy_instance_address:
-            raise RuntimeError("Failed to extract policy instance address from deployment transaction")
-        
-        from .contracts import ListPolicyContract
-        return ListPolicyContract(self.eth, policy_instance_address)
 
     def wait_for_tx(self, tx_hash: Union[str, bytes], timeout: float = 120.0) -> dict:
         if isinstance(tx_hash, bytes):

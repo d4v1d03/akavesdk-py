@@ -39,7 +39,6 @@ try:
 except ImportError:
     DAG_PB_AVAILABLE = False
 
-from private.encryption.encryption import encrypt, decrypt
 from .model import FileBlockUpload
 from .config import DAG_PB_CODEC, RAW_CODEC, DEFAULT_CID_VERSION
 
@@ -159,15 +158,13 @@ class ChunkDAG:
     encoded_size: int                  # encoded size (was proto_node_size)
     blocks: List[FileBlockUpload]      # Blocks in the chunk
 
-def build_dag(ctx: Any, reader: BinaryIO, block_size: int, enc_key: Optional[bytes] = None) -> ChunkDAG:
+def build_dag(ctx: Any, reader: BinaryIO, block_size: int) -> ChunkDAG:
     try:
         data = reader.read()
         if not data:
             raise DAGError("empty data")
         
         raw_data_size = len(data)
-        if enc_key and len(enc_key) > 0:
-            data = encrypt(enc_key, data, b"dag_encryption")
         
         blocks = []
         

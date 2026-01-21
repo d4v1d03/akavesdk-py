@@ -189,42 +189,6 @@ finally:
     print("Connection closed")
 ```
 
-### Streaming API Usage
-
-```python
-from akavesdk import SDK, SDKError
-
-config = SDKConfig(
-    address="connect.akave.ai:5500",
-    max_concurrency=10,
-    block_part_size=1 * 1024 * 1024,  # 1MB
-    use_connection_pool=True
-)
-
-# Initialize the SDK
-sdk = SDK(config)
-
-try:
-    # Get streaming API
-    streaming = sdk.streaming_api()
-    
-    # List files in a bucket
-    files = streaming.list_files({}, "my-bucket")
-    for file in files:
-        print(f"File: {file.name}, Size: {file.size} bytes")
-    
-    # Get file info
-    file_info = streaming.file_info({}, "my-bucket", "my-file.txt")
-    print(f"File info: {file_info}")
-except SDKError as e:
-    # handle sdk exception
-    pass
-except Exception as e:
-    # handle generic exception
-    pass
-finally:
-    sdk.close()
-```
 
 ## File Size Requirements
 

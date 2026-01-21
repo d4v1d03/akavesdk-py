@@ -580,7 +580,7 @@ class IPC:
                 except Exception as e:
                     return (True, e)
 
-            retry_err = self.with_retry.do(None, get_bucket_call)
+            retry_err = self.with_retry.do(get_bucket_call)
             if retry_err:
                 raise SDKError(f"failed to get bucket: {str(retry_err)}")
 
@@ -675,9 +675,7 @@ class IPC:
 
                 file_upload.state.pre_create_chunk(chunk_upload, tx_hash)
                 
-                err = self.upload_chunk(ctx, chunk_upload, pool)
-                if err is not None:
-                    raise err
+                self.upload_chunk(ctx, chunk_upload, pool)
 
                 file_upload.state.chunk_uploaded(chunk_upload)
                 total_chunks_uploaded += 1
@@ -1031,7 +1029,7 @@ class IPC:
                     TypedData("chunkCID", "bytes"),
                     TypedData("blockCID", "bytes32"), 
                     TypedData("chunkIndex", "uint256"),
-                    TypedData("blockIndex", "uint256"),
+                    TypedData("blockIndex", "uint8"),
                     TypedData("nodeId", "bytes32"),
                     TypedData("nonce", "uint256"),
                     TypedData("deadline", "uint256"),

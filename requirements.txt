@@ -1,6 +1,6 @@
 # Core dependencies
-grpcio>=1.60.0
-grpcio-tools>=1.60.0
+grpcio>=1.63.0
+grpcio-tools>=1.63.0
 protobuf>=5.26.1,<6.0dev
 uuid==1.30
 
@@ -27,10 +27,6 @@ opentelemetry-exporter-jaeger==1.21.0
 opentelemetry-instrumentation-grpc==0.49b0
 prometheus-client==0.19.0
 structlog==24.1.0
-
-# Error handling & utilities
-pydantic==2.6.3
-rich==13.7.0
 
 # Cobra CLI equivalent
 click==8.1.7

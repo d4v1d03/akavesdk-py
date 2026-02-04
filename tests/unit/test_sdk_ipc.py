@@ -20,7 +20,12 @@ class TestCreateBucket:
         self.mock_ipc.eth = Mock()
         self.mock_ipc.eth.eth = Mock()
         
-        self.config = SDKConfig(address="test:5500")
+        self.config = SDKConfig(
+            address="test:5500",
+            max_concurrency=10,
+            block_part_size=1048576,
+            use_connection_pool=True
+        )
         self.ipc = IPC(self.mock_client, self.mock_conn, self.mock_ipc, self.config)
     
     def test_create_bucket_success(self):

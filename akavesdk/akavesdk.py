@@ -15,9 +15,7 @@ if PB_PATH not in sys.path:
 # Import SDK classes using absolute imports
 from sdk.sdk import SDK, BucketCreateResult, Bucket
 from sdk.config import SDKError
-from sdk.sdk_streaming import StreamingAPI
 from sdk.sdk_ipc import IPC
-from sdk.erasure_code import ErasureCode
 # Export all classes
-__all__ = ["SDK", "SDKError", "StreamingAPI", "IPC",
-           "BucketCreateResult", "Bucket", "ErasureCode"]
+__all__ = ["SDK", "SDKError", "IPC",
+           "BucketCreateResult", "Bucket"]

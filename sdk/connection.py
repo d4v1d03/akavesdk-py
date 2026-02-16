@@ -3,7 +3,7 @@ import time
 import threading
 import logging
 from typing import Dict, Optional, Tuple, Callable
-from private.pb import nodeapi_pb2_grpc, ipcnodeapi_pb2_grpc
+from private.pb import ipcnodeapi_pb2_grpc
 from .config import SDKError
 
 
@@ -36,13 +36,13 @@ class ConnectionPool:
         except Exception as e:
             return None, None, SDKError(f"Failed to create IPC client: {str(e)}")
 
-    def create_streaming_client(self, addr: str, pooled: bool) -> Tuple[nodeapi_pb2_grpc.StreamAPIStub, Optional[Callable[[], None]], Optional[Exception]]:
+    def create_archival_client(self, addr: str, pooled: bool) -> Tuple[ipcnodeapi_pb2_grpc.IPCArchivalAPIStub, Optional[Callable[[], None]], Optional[Exception]]:
         try:
             if pooled:
                 conn, err = self._get(addr)
                 if err:
                     return None, None, err
-                return nodeapi_pb2_grpc.StreamAPIStub(conn), None, None
+                return ipcnodeapi_pb2_grpc.IPCArchivalAPIStub(conn), None, None
 
             options = [
                 ('grpc.max_receive_message_length', 100 * 1024 * 1024), 
@@ -54,10 +54,10 @@ class ConnectionPool:
                 ('grpc.http2.min_time_between_pings_ms', 10000),  
             ]
             conn = grpc.insecure_channel(addr, options=options)
-            return nodeapi_pb2_grpc.StreamAPIStub(conn), conn.close, None
+            return ipcnodeapi_pb2_grpc.IPCArchivalAPIStub(conn), conn.close, None
             
         except Exception as e:
-            return None, None, SDKError(f"Failed to create streaming client: {str(e)}")
+            return None, None, SDKError(f"Failed to create archival client: {str(e)}")
 
     def _get(self, addr: str) -> Tuple[Optional[grpc.Channel], Optional[Exception]]:
         with self._lock:

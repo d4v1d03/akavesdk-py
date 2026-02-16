@@ -8,6 +8,9 @@ if PRIVATE_PATH not in sys.path:
     sys.path.append(PRIVATE_PATH)
 
 try:
+    # Import WithRetry from retry module
+    from private.retry.retry import WithRetry
+    
     from .sdk import (
         # Core SDK class
         SDK,
@@ -16,7 +19,6 @@ try:
         BucketCreateResult,
         Bucket,
         MonkitStats,
-        WithRetry,
         AkaveContractFetcher,
         
         # SDK Options
@@ -27,6 +29,8 @@ try:
         WithStreamingMaxBlocksInChunk,
         WithErasureCoding,
         WithChunkBuffer,
+        WithBatchSize,
+        WithCustomHttpClient,
         WithoutRetry,
         
         # Utility functions
@@ -57,9 +61,13 @@ try:
         IPCFileDownload,
         FileChunkDownload,
         Chunk,
-        AkaveBlockData,
         FileBlockUpload,
-        FileBlockDownload
+        FileBlockDownload,
+        ArchivalMetadata,
+        ArchivalChunk,
+        ArchivalBlock,
+        PDPBlockData,
+        ErrMissingArchivalBlock
     )
     
     _SDK_AVAILABLE = True
@@ -195,10 +203,6 @@ except ImportError as e:
         def __init__(self, *args, **kwargs):
             raise ImportError("SDK not available due to missing dependencies")
     
-    class AkaveBlockData:
-        def __init__(self, *args, **kwargs):
-            raise ImportError("SDK not available due to missing dependencies")
-    
     class FileBlockUpload:
         def __init__(self, *args, **kwargs):
             raise ImportError("SDK not available due to missing dependencies")
@@ -206,6 +210,25 @@ except ImportError as e:
     class FileBlockDownload:
         def __init__(self, *args, **kwargs):
             raise ImportError("SDK not available due to missing dependencies")
+    
+    class ArchivalMetadata:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SDK not available due to missing dependencies")
+    
+    class ArchivalChunk:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SDK not available due to missing dependencies")
+    
+    class ArchivalBlock:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SDK not available due to missing dependencies")
+    
+    class PDPBlockData:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SDK not available due to missing dependencies")
+    
+    class ErrMissingArchivalBlock(Exception):
+        pass
 
 try:
     from .config import SDKConfig, SDKError, Config
@@ -221,9 +244,14 @@ except ImportError:
     IPC = None
 
 try:
-    from .sdk_streaming import StreamingAPI
+    from private.cids import verify_raw, verify, CIDError
 except ImportError:
-    StreamingAPI = None
+    def verify_raw(*args, **kwargs):
+        raise ImportError("CID utilities not available due to missing dependencies")
+    def verify(*args, **kwargs):
+        raise ImportError("CID utilities not available due to missing dependencies")
+    CIDError = Exception
+
 
 __all__ = [
     # Core SDK
@@ -265,7 +293,11 @@ __all__ = [
     
     # APIs
     'IPC',
-    'StreamingAPI',
+    
+    # CID utilities
+    'verify_raw',
+    'verify',
+    'CIDError',
     
     # Model classes
     'IPCFileUpload',
@@ -281,7 +313,11 @@ __all__ = [
     'IPCFileDownload',
     'FileChunkDownload',
     'Chunk',
-    'AkaveBlockData',
     'FileBlockUpload',
     'FileBlockDownload',
+    'ArchivalMetadata',
+    'ArchivalChunk',
+    'ArchivalBlock',
+    'PDPBlockData',
+    'ErrMissingArchivalBlock',
 ]

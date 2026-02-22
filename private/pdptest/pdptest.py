@@ -22,21 +22,22 @@ def pick_server_url() -> str:
         pytest.skip("PDP server URL flag missing, example: -pdp-server-url=<pdp server url>")
     return PDP_SERVER_URL
 
-#temporary solution to calculate piece CID
+
+# temporary solution to calculate piece CID
 def calculate_piece_cid(data: bytes) -> str:
     try:
         import subprocess
         import tempfile
         import os
-        
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as f:
             f.write(data)
             temp_path = f.name
-        
+
         try:
             result = subprocess.run(
-                ['go', 'run', '-', temp_path],
-                input='''
+                ["go", "run", "-", temp_path],
+                input="""
 package main
 import (
     "fmt"
@@ -62,19 +63,19 @@ func main() {
     }
     fmt.Print(pieceCid.String())
 }
-''',
+""",
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
-            
+
             if result.returncode != 0:
                 raise RuntimeError(f"Failed to calculate piece CID: {result.stderr}")
-            
+
             return result.stdout.strip()
         finally:
             os.unlink(temp_path)
-            
+
     except FileNotFoundError:
         raise RuntimeError(
             "Go toolchain not found. To calculate piece CIDs, you need:\n"

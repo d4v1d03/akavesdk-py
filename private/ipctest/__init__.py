@@ -11,7 +11,7 @@ from .ipctest import (
 
 __all__ = [
     "IPCTestError",
-    "TransactionFailedError", 
+    "TransactionFailedError",
     "NonceTooLowError",
     "ReplaceUnderpricedError",
     "new_funded_account",
